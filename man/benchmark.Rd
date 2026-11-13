@@ -11,7 +11,8 @@ benchmark(
   encapsulate = NA_character_,
   allow_hotstart = FALSE,
   clone = c("task", "learner", "resampling"),
-  unmarshal = TRUE
+  unmarshal = TRUE,
+  callbacks = NULL
 )
 }
 \arguments{
@@ -24,13 +25,13 @@ Additionally, you can set the additional column 'param_values', see \code{\link[
 
 \item{store_models}{(\code{logical(1)})\cr
 Store the fitted model in the resulting object=
-Set to \code{TRUE} if you want to further analyse the models or want to
+Set to \code{TRUE} if you want to further analyze the models or want to
 extract information like variable importance.}
 
 \item{store_backends}{(\code{logical(1)})\cr
 Keep the \link{DataBackend} of the \link{Task} in the \link{ResampleResult}?
 Set to \code{TRUE} if your performance measures require a \link{Task},
-or to analyse results more conveniently.
+or to analyze results more conveniently.
 Set to \code{FALSE} to reduce the file size and memory footprint
 after serialization.
 The current default is \code{TRUE}, but this eventually will be changed
@@ -41,11 +42,12 @@ If not \code{NA}, enables encapsulation by setting the field
 \code{Learner$encapsulate} to one of the supported values:
 \code{"none"} (disable encapsulation),
 \code{"try"} (captures errors but output is printed to the console and not logged),
-\code{"evaluate"} (execute via \CRANpkg{evaluate}) and
-\code{"callr"} (start in external session via \CRANpkg{callr}).
+\code{"evaluate"} (execute via \CRANpkg{evaluate}),
+\code{"callr"} (start in external session via \CRANpkg{callr}) and
+\code{"mirai"} (start in a \CRANpkg{mirai} daemon, see \link{Learner}).
 If \code{NA}, encapsulation is not changed, i.e. the settings of the
 individual learner are active.
-Additionally, if encapsulation is set to \code{"evaluate"} or \code{"callr"},
+Additionally, if encapsulation is set to \code{"try"}, \code{"evaluate"}, \code{"callr"}, or \code{"mirai"},
 the fallback learner is set to the featureless learner if the learner
 does not already have a fallback configured.}
 
@@ -63,17 +65,31 @@ Per default, all input objects are cloned.}
 Whether to unmarshal learners that were marshaled during the execution.
 If \code{TRUE} all models are stored in unmarshaled form.
 If \code{FALSE}, all learners (that need marshaling) are stored in marshaled form.}
+
+\item{callbacks}{(list of \link[mlr3misc:Callback]{mlr3misc::Callback} | \code{NULL})\cr
+Callbacks to be executed during the resampling process.
+See \link{CallbackResample} and \link{ContextResample} for details.}
 }
 \value{
 \link{BenchmarkResult}.
 }
 \description{
-Runs a benchmark on arbitrary combinations of tasks (\link{Task}), learners (\link{Learner}), and resampling strategies (\link{Resampling}), possibly in parallel.
+Runs a benchmark on arbitrary combinations of tasks (\link{Task}), learners (\link{Learner}),
+and resampling strategies (\link{Resampling}), possibly in parallel.
+
+For large-scale benchmarking we recommend to use the \CRANpkg{mlr3batchmark} package.
+This package runs benchmark experiments on high-performance computing clusters and handles failed experiments.
 }
 \note{
 The fitted models are discarded after the predictions have been scored in order to reduce memory consumption.
 If you need access to the models for later analysis, set \code{store_models} to \code{TRUE}.
 }
+\section{Stochasticity}{
+
+Note that uninstantiated \code{\link{Resampling}}s are instantiated on the task, making
+the function stochastic even in case of deterministic learners.
+}
+
 \section{Predict Sets}{
 
 If you want to compare the performance of a learner on the training with the performance
@@ -92,10 +108,15 @@ The (list of) created measures can finally be passed to \verb{$aggregate()} or \
 \section{Parallelization}{
 
 
-This function can be parallelized with the \CRANpkg{future} package.
-One job is one resampling iteration, and all jobs are send to an apply function
-from \CRANpkg{future.apply} in a single batch.
+This function can be parallelized with the \CRANpkg{future} or \CRANpkg{mirai} package.
+One job is one resampling iteration.
+All jobs are send to an apply function from \CRANpkg{future.apply} or \code{mirai::mirai_map()} in a single batch.
 To select a parallel backend, use \code{\link[future:plan]{future::plan()}}.
+To use \code{mirai}, call \code{mirai::daemons(.compute = "mlr3_parallelization")} before calling this function.
+The \code{future} package guarantees reproducible results independent of the parallel backend.
+The results of \code{mirai} will not be the same but can be made reproducible by setting a \code{seed} when calling \code{mirai::daemons()}.
+More on parallelization can be found in the book:
+\url{https://mlr3book.mlr-org.com/chapters/chapter10/advanced_technical_aspects_of_mlr3.html}
 }
 
 \section{Progress Bars}{
@@ -126,6 +147,11 @@ or \code{"trace"}:
 
 \if{html}{\out{<div class="sourceCode">}}\preformatted{lgr::get_logger("mlr3")$set_threshold("debug")
 }\if{html}{\out{</div>}}
+
+To obtain a more informative traceback when an iteration fails, set
+\code{options(mlr3.debug = TRUE)}. This disables parallelization via \CRANpkg{future}
+so that errors are raised in the main process.
+Note that results computed in debug mode use a different seeding mechanism and are \strong{not reproducible}.
 
 To log to a file or a data base, see the documentation of \link[lgr:lgr-package]{lgr::lgr-package}.
 }
@@ -188,8 +214,8 @@ rr$resampling$train_set(2)
 \item \CRANpkg{mlr3benchmark} for post-hoc analysis of benchmark results.
 }
 
-Other benchmark: 
+Other benchmark:
 \code{\link{BenchmarkResult}},
-\code{\link{benchmark_grid}()}
+\code{\link[=benchmark_grid]{benchmark_grid()}}
 }
 \concept{benchmark}

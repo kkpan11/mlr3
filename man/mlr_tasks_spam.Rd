@@ -66,20 +66,20 @@ Dua, Dheeru, Graff, Casey (2017).
 }
 }
 
-Other Task: 
+Other Task:
 \code{\link{Task}},
 \code{\link{TaskClassif}},
 \code{\link{TaskRegr}},
 \code{\link{TaskSupervised}},
 \code{\link{TaskUnsupervised}},
+\code{\link{california_housing}},
 \code{\link{mlr_tasks}},
-\code{\link{mlr_tasks_boston_housing}},
 \code{\link{mlr_tasks_breast_cancer}},
+\code{\link{mlr_tasks_diabetes}},
 \code{\link{mlr_tasks_german_credit}},
 \code{\link{mlr_tasks_iris}},
 \code{\link{mlr_tasks_mtcars}},
 \code{\link{mlr_tasks_penguins}},
-\code{\link{mlr_tasks_pima}},
 \code{\link{mlr_tasks_sonar}},
 \code{\link{mlr_tasks_wine}},
 \code{\link{mlr_tasks_zoo}}

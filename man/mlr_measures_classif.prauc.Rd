@@ -12,7 +12,7 @@ in binary classification tasks.
 Computes the area under the Precision-Recall curve (PRC).
 The PRC can be interpreted as the relationship between precision and recall (sensitivity),
 and is considered to be a more appropriate measure for unbalanced datasets than the ROC curve.
-The PRC is computed by integration of the piecewise function.
+The AUC-PRC is computed by integration of the piecewise function.
 
 This measure is undefined if the true values are either all positive or
 all negative.
@@ -54,7 +54,7 @@ Empty ParamSet
 
 \code{as.data.table(mlr_measures)} for a complete table of all (also dynamically created) \link{Measure} implementations.
 
-Other classification measures: 
+Other classification measures:
 \code{\link{mlr_measures_classif.acc}},
 \code{\link{mlr_measures_classif.auc}},
 \code{\link{mlr_measures_classif.bacc}},
@@ -74,6 +74,7 @@ Other classification measures:
 \code{\link{mlr_measures_classif.mauc_au1u}},
 \code{\link{mlr_measures_classif.mauc_aunp}},
 \code{\link{mlr_measures_classif.mauc_aunu}},
+\code{\link{mlr_measures_classif.mauc_mu}},
 \code{\link{mlr_measures_classif.mbrier}},
 \code{\link{mlr_measures_classif.mcc}},
 \code{\link{mlr_measures_classif.npv}},
@@ -87,7 +88,7 @@ Other classification measures:
 \code{\link{mlr_measures_classif.tp}},
 \code{\link{mlr_measures_classif.tpr}}
 
-Other binary classification measures: 
+Other binary classification measures:
 \code{\link{mlr_measures_classif.auc}},
 \code{\link{mlr_measures_classif.bbrier}},
 \code{\link{mlr_measures_classif.dor}},
@@ -98,7 +99,6 @@ Other binary classification measures:
 \code{\link{mlr_measures_classif.fomr}},
 \code{\link{mlr_measures_classif.fp}},
 \code{\link{mlr_measures_classif.fpr}},
-\code{\link{mlr_measures_classif.mcc}},
 \code{\link{mlr_measures_classif.npv}},
 \code{\link{mlr_measures_classif.ppv}},
 \code{\link{mlr_measures_classif.precision}},

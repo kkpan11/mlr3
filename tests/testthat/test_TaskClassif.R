@@ -42,6 +42,11 @@ test_that("Target is character/factor", {
   expect_error(TaskClassif$new("iris", backend = b, target = "Sepal.Length"), "Target column")
 })
 
+test_that("TaskClassif rejects NAs in target", {
+  dt = data.table::data.table(x = 1:10, y = factor(c(NA, letters[1:9])))
+  expect_error(as_task_classif(dt, target = "y"), "must not contain missing values")
+})
+
 test_that("0 feature task", {
   b = as_data_backend(iris[, 5L, drop = FALSE])
   task = TaskClassif$new(id = "zero_feat_task", b, target = "Species")
@@ -111,4 +116,69 @@ test_that("target is encoded as factor (#629)", {
 
   dt$target = ordered(dt$target)
   TaskClassif$new(id = "XX", backend = dt, target = "target")
+})
+
+test_that("offset column role works with binary tasks", {
+  task = tsk("diabetes")
+  expect_null(task$offset)
+
+  task$set_col_roles("age", "offset")
+  expect_subset("offset", task$properties)
+  expect_data_table(task$offset, nrows = task$nrow, ncols = 2)
+  expect_subset(c("row_id", "offset"), names(task$offset))
+
+  expect_error(
+    {
+      task$col_roles$offset = c("glucose", "diabetes")
+    },
+    "There may only be up to one column with role"
+  )
+
+  expect_error(
+    {
+      task$col_roles$offset = c("glucose")
+    },
+    "contain missing values"
+  )
+
+  expect_warning(lrn("classif.rpart")$train(task), "has offset")
+})
+
+test_that("offset column role works with multiclass tasks", {
+  task = tsk("penguins")
+  expect_null(task$offset)
+  task$set_col_roles("year", "offset")
+  expect_subset("offset", task$properties)
+  expect_data_table(task$offset, nrows = task$nrow, ncols = 2)
+  expect_subset(c("row_id", "offset"), names(task$offset))
+
+  expect_error(
+    {
+      task$col_roles$offset = "bill_length"
+    },
+    "contain missing values"
+  )
+
+  task = tsk("wine")
+
+  expect_error(
+    {
+      task$col_roles$offset = c("alcohol", "ash")
+    },
+    "Must be a subset of"
+  )
+
+  task = tsk("wine")
+  data = task$data()
+  set(data, j = "offset_1", value = runif(nrow(data)))
+  set(data, j = "offset_2", value = runif(nrow(data)))
+  task = as_task_classif(data, target = "type")
+  task$set_col_roles(c("offset_1", "offset_2"), "offset")
+
+  expect_subset("offset", task$properties)
+  expect_data_table(task$offset, nrows = task$nrow, ncols = 3)
+  expect_subset(c("row_id", "offset_1", "offset_2"), names(task$offset))
+
+  task$cbind(data.table(o3 = runif(task$nrow)))
+  expect_error(task$set_col_roles(c("offset_1", "o3"), "offset"), class = "Mlr3ErrorInput")
 })

@@ -1,40 +1,42 @@
 #' @include DataBackend.R
-DataBackendRename = R6Class("DataBackendRename", inherit = DataBackend, cloneable = FALSE,
+DataBackendRename = R6Class(
+  "DataBackendRename",
+  inherit = DataBackend,
+  cloneable = FALSE,
   public = list(
     old = NULL,
     new = NULL,
 
     initialize = function(b, old, new) {
-      super$initialize(data = b, b$primary_key, "data.table")
+      super$initialize(data = b, b$primary_key)
       assert_character(old, any.missing = FALSE, unique = TRUE)
       assert_subset(old, b$colnames)
       assert_character(new, any.missing = FALSE, len = length(old))
-      assert_names(new, if (allow_utf8_names()) "unique" else "strict")
+      assert_names(new, "unique")
 
       ii = old != new
       old = old[ii]
       new = new[ii]
 
-      if (self$primary_key %in% old) {
-        stopf("Renaming the primary key is not supported")
+      if (self$primary_key %chin% old) {
+        error_input("Renaming the primary key is not supported")
       }
-
 
       resulting_names = map_values(b$colnames, old, new)
       dup = anyDuplicated(resulting_names)
       if (dup > 0L) {
-        stopf("Duplicated column name after rename: %s", resulting_names[dup])
+        error_input("Duplicated column name after rename: %s", resulting_names[dup])
       }
 
       self$old = old
       self$new = new
     },
 
-    data = function(rows, cols, data_format = self$data_formats[1L]) {
+    data = function(rows, cols) {
       assert_names(cols, type = "unique")
       b = private$.data
       cols = map_values(intersect(cols, self$colnames), self$new, self$old)
-      data = b$data(rows, cols, data_format)
+      data = b$data(rows, cols)
       set_col_names(data, map_values(names(data), self$old, self$new))
     },
 

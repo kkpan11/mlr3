@@ -17,6 +17,43 @@ with_future = function(backend, expr, ...) {
   force(expr)
 }
 
+with_mirai = function(expr, compute, seed = NULL) {
+  requireNamespace("mirai")
+  mirai::daemons(1, .compute = compute, seed = seed)
+  on.exit(mirai::daemons(0, .compute = compute), add = TRUE)
+  force(expr)
+  testthat::expect_true(mirai::status(.compute = compute)$mirai["completed"] > 0)
+}
+
 private = function(x) {
   x[[".__enclos_env__"]][["private"]]
 }
+
+
+iris_weights_learner = TaskClassif$new(
+  "iris_weights_learner",
+  as_data_backend(cbind(datasets::iris, data.frame(w = rep(c(1, 10, 100), each = 50)))),
+  target = "Species"
+)
+iris_weights_learner$set_col_roles("w", "weights_learner")
+
+iris_weights_measure = TaskClassif$new(
+  "iris_weights_measure",
+  as_data_backend(cbind(datasets::iris, data.frame(w = rep(c(1, 10, 100), each = 50)))),
+  target = "Species"
+)
+iris_weights_measure$set_col_roles("w", "weights_measure")
+
+cars_weights_learner = TaskRegr$new(
+  "cars_weights_learner",
+  as_data_backend(cbind(datasets::cars, data.frame(w = rep(c(1, 10), each = 25)))),
+  target = "dist"
+)
+cars_weights_learner$set_col_roles("w", "weights_learner")
+
+cars_weights_measure = TaskRegr$new(
+  "cars_weights_measure",
+  as_data_backend(cbind(datasets::cars, data.frame(w = rep(c(1, 10), each = 25)))),
+  target = "dist"
+)
+cars_weights_measure$set_col_roles("w", "weights_measure")

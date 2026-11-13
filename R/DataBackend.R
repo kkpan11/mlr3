@@ -1,6 +1,7 @@
 #' @title DataBackend
 #'
 #' @include mlr_reflections.R
+#' @include warn_deprecated.R
 #'
 #' @description
 #' This is the abstract base class for data backends.
@@ -9,20 +10,17 @@
 #' It is not recommended to work directly with the DataBackend.
 #' Instead, all data access is handled transparently via the [Task].
 #'
-#' This package comes with two implementations for backends:
+#' This package currently ships with one implementation for backends:
 #'
 #' * [DataBackendDataTable] which stores the data as [data.table::data.table()].
-#' * [DataBackendMatrix] which stores the data as sparse [Matrix::sparseMatrix()].
 #'
 #' To connect to out-of-memory database management systems such as SQL servers,
 #' see the extension package \CRANpkg{mlr3db}.
 #'
 #' @details
 #' The required set of fields and methods to implement a custom `DataBackend` is
-#' listed in the respective sections (see [DataBackendDataTable] or
-#' [DataBackendMatrix] for exemplary implementations of the interface).
+#' listed in the respective sections (see [DataBackendDataTable]).
 #'
-#' @template param_data_formats
 #' @template seealso_databackend
 #'
 #' @export
@@ -36,36 +34,32 @@
 #' b$data(rows = 1:2, cols = "x")
 #' b$distinct(rows = b$rownames, "y")
 #' b$missings(rows = b$rownames, cols = names(data))
-DataBackend = R6Class("DataBackend", cloneable = FALSE,
+DataBackend = R6Class(
+  "DataBackend",
+  cloneable = FALSE,
   public = list(
     #' @field primary_key (`character(1)`)\cr
     #' Column name of the primary key column of positive and unique integer row ids.
     primary_key = NULL,
 
-    #' @field data_formats (`character()`)\cr
-    #' Set of supported formats, e.g. `"data.table"` or `"Matrix"`.
-    data_formats = NULL,
-
     #' @description
     #' Creates a new instance of this [R6][R6::R6Class] class.
     #'
     #' Note: This object is typically constructed via a derived classes, e.g.
-    #' [DataBackendDataTable] or [DataBackendMatrix], or via the S3 method
+    #' [DataBackendDataTable], or via the S3 method
     #' [as_data_backend()].
     #'
     #' @param data (any)\cr
     #'   The format of the input data depends on the specialization. E.g.,
-    #'   [DataBackendDataTable] expects a [data.table::data.table()] and
-    #'   [DataBackendMatrix] expects a [Matrix::Matrix()] from \CRANpkg{Matrix}.
+    #'   [DataBackendDataTable] expects a [data.table::data.table()].
     #'
     #' @param primary_key (`character(1)`)\cr
     #'   Each DataBackend needs a way to address rows, which is done via a
     #'   column of unique integer values, referenced here by `primary_key`. The
     #'   use of this variable may differ between backends.
-    initialize = function(data, primary_key, data_formats = "data.table") {
+    initialize = function(data, primary_key) {
       private$.data = data
       self$primary_key = assert_string(primary_key)
-      self$data_formats = assert_subset(data_formats, mlr_reflections$data_formats, empty.ok = FALSE)
     },
 
     #' @description
@@ -79,7 +73,7 @@ DataBackend = R6Class("DataBackend", cloneable = FALSE,
     #' Printer.
     print = function() {
       nr = self$nrow
-      catf("%s (%ix%i)", format(self), nr, self$ncol)
+      cat_cli(cli_h1("{.cls {class(self)[1L]}} ({.val {nr}}x{.val {self$ncol}})"))
       print(self$head(6L), row.names = FALSE, print.keys = FALSE)
       if (nr > 6L) {
         catf("[...] (%i rows omitted)", nr - 6L)
@@ -88,7 +82,8 @@ DataBackend = R6Class("DataBackend", cloneable = FALSE,
   ),
 
   active = list(
-    #' @template field_hash
+    #' @field hash (`character(1)`)\cr
+    #' Hash (unique identifier) for this object.
     hash = function(rhs) {
       if (missing(rhs)) {
         if (is.na(private$.hash)) {

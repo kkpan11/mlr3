@@ -38,7 +38,8 @@ In case of ties in the ratio, one of the tied class labels is selected randomly.
 Note that there are the following edge cases for threshold equal to \code{0} which are handled specially:
 \enumerate{
 \item With threshold 0 the resulting ratio gets \code{Inf} and thus gets always selected.
-If there are multiple ratios with value \code{Inf}, one is selected according to \code{ties_method} (randomly per default).
+If there are multiple ratios with value \code{Inf}, one is selected according to \code{ties_method}
+(randomly per default).
 \item If additionally the predicted probability is also 0, the ratio \code{0/0} results in \code{NaN} values.
 These are simply replaced by \code{0} and thus will never get selected.
 }
@@ -76,137 +77,148 @@ p$score(measures = msr("classif.ce"))
 }
 }
 
-Other Prediction: 
+Other Prediction:
 \code{\link{Prediction}},
 \code{\link{PredictionRegr}}
 }
 \concept{Prediction}
 \section{Super class}{
-\code{\link[mlr3:Prediction]{mlr3::Prediction}} -> \code{PredictionClassif}
+\code{\link[mlr3:Prediction]{Prediction}} -> \code{PredictionClassif}
 }
 \section{Active bindings}{
-\if{html}{\out{<div class="r6-active-bindings">}}
-\describe{
-\item{\code{response}}{(\code{factor()})\cr
+  \if{html}{\out{<div class="r6-active-bindings">}}
+  \describe{
+    \item{\code{response}}{(\code{factor()})\cr
 Access to the stored predicted class labels.}
 
-\item{\code{prob}}{(\code{matrix()})\cr
+    \item{\code{prob}}{(\code{matrix()})\cr
 Access to the stored probabilities.}
 
-\item{\code{confusion}}{(\code{matrix()})\cr
+    \item{\code{confusion}}{(\code{matrix()})\cr
 Confusion matrix, as resulting from the comparison of truth and response.
 Truth is in columns, predicted response is in rows.}
-}
-\if{html}{\out{</div>}}
+  }
+  \if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
-\itemize{
-\item \href{#method-PredictionClassif-new}{\code{PredictionClassif$new()}}
-\item \href{#method-PredictionClassif-set_threshold}{\code{PredictionClassif$set_threshold()}}
-\item \href{#method-PredictionClassif-clone}{\code{PredictionClassif$clone()}}
+  \itemize{
+    \item \href{#method-PredictionClassif-initialize}{\code{PredictionClassif$new()}}
+    \item \href{#method-PredictionClassif-set_threshold}{\code{PredictionClassif$set_threshold()}}
+    \item \href{#method-PredictionClassif-clone}{\code{PredictionClassif$clone()}}
+  }
 }
-}
-\if{html}{\out{
-<details open><summary>Inherited methods</summary>
+\if{html}{\out{<details><summary>Inherited methods</summary>
 <ul>
-<li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="filter"><a href='../../mlr3/html/Prediction.html#method-Prediction-filter'><code>mlr3::Prediction$filter()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="format"><a href='../../mlr3/html/Prediction.html#method-Prediction-format'><code>mlr3::Prediction$format()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="help"><a href='../../mlr3/html/Prediction.html#method-Prediction-help'><code>mlr3::Prediction$help()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="print"><a href='../../mlr3/html/Prediction.html#method-Prediction-print'><code>mlr3::Prediction$print()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="score"><a href='../../mlr3/html/Prediction.html#method-Prediction-score'><code>mlr3::Prediction$score()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="filter"><a href='../../mlr3/html/Prediction.html#method-Prediction-filter'><code>Prediction$filter()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="format"><a href='../../mlr3/html/Prediction.html#method-Prediction-format'><code>Prediction$format()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="help"><a href='../../mlr3/html/Prediction.html#method-Prediction-help'><code>Prediction$help()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="obs_loss"><a href='../../mlr3/html/Prediction.html#method-Prediction-obs_loss'><code>Prediction$obs_loss()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="print"><a href='../../mlr3/html/Prediction.html#method-Prediction-print'><code>Prediction$print()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="mlr3" data-topic="Prediction" data-id="score"><a href='../../mlr3/html/Prediction.html#method-Prediction-score'><code>Prediction$score()</code></a></span></li>
 </ul>
-</details>
-}}
+</details>}}
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-PredictionClassif-new"></a>}}
-\if{latex}{\out{\hypertarget{method-PredictionClassif-new}{}}}
-\subsection{Method \code{new()}}{
-Creates a new instance of this \link[R6:R6Class]{R6} class.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{PredictionClassif$new(
+\if{html}{\out{<a id="method-PredictionClassif-initialize"></a>}}
+\if{latex}{\out{\hypertarget{method-PredictionClassif-initialize}{}}}
+\subsection{\code{PredictionClassif$new()}}{
+  Creates a new instance of this \link[R6:R6Class]{R6} class.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{PredictionClassif$new(
   task = NULL,
   row_ids = task$row_ids,
   truth = task$truth(),
   response = NULL,
   prob = NULL,
-  check = TRUE
-)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{task}}{(\link{TaskClassif})\cr
+  weights = NULL,
+  check = TRUE,
+  extra = NULL,
+  raw = NULL
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{task}}{(\link{TaskClassif})\cr
 Task, used to extract defaults for \code{row_ids} and \code{truth}.}
-
-\item{\code{row_ids}}{(\code{integer()})\cr
+      \item{\code{row_ids}}{(\code{integer()})\cr
 Row ids of the predicted observations, i.e. the row ids of the test set.}
-
-\item{\code{truth}}{(\code{factor()})\cr
+      \item{\code{truth}}{(\code{factor()})\cr
 True (observed) labels. See the note on manual construction.}
-
-\item{\code{response}}{(\code{character()} | \code{factor()})\cr
+      \item{\code{response}}{(\code{character()} | \code{factor()})\cr
 Vector of predicted class labels.
 One element for each observation in the test set.
 Character vectors are automatically converted to factors.
 See the note on manual construction.}
-
-\item{\code{prob}}{(\code{matrix()})\cr
+      \item{\code{prob}}{(\code{matrix()})\cr
 Numeric matrix of posterior class probabilities with one column for each class
 and one row for each observation in the test set.
 Columns must be named with class labels, row names are automatically removed.
 If \code{prob} is provided, but \code{response} is not, the class labels are calculated from
 the probabilities using \code{\link[=max.col]{max.col()}} with \code{ties.method} set to \code{"random"}.}
-
-\item{\code{check}}{(\code{logical(1)})\cr
+      \item{\code{weights}}{(\code{numeric()})\cr
+Vector of measure weights for each observation. Should be constructed from
+the \code{Task}'s \code{weights_measure} column.}
+      \item{\code{check}}{(\code{logical(1)})\cr
 If \code{TRUE}, performs some argument checks and predict type conversions.}
+      \item{\code{extra}}{(named \code{list()})\cr
+Additional per-observation data to be stored in the prediction object.
+Each element must be a vector with the same length as \code{row_ids}.
+See the \verb{$extra} field for details.}
+      \item{\code{raw}}{(any)\cr
+Raw prediction object from the upstream model. Stored as-is without validation.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
-\if{html}{\out{</div>}}
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-PredictionClassif-set_threshold"></a>}}
 \if{latex}{\out{\hypertarget{method-PredictionClassif-set_threshold}{}}}
-\subsection{Method \code{set_threshold()}}{
-Sets the prediction response based on the provided threshold.
+\subsection{\code{PredictionClassif$set_threshold()}}{
+  Sets the prediction response based on the provided threshold.
 See the section on thresholding for more information.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{PredictionClassif$set_threshold(threshold, ties_method = "random")}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{threshold}}{(\code{numeric()}).}
-
-\item{\code{ties_method}}{(\code{character(1)})\cr
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{PredictionClassif$set_threshold(threshold, ties_method = "random")}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{threshold}}{(\code{numeric()}).}
+      \item{\code{ties_method}}{(\code{character(1)})\cr
 One of \code{"random"}, \code{"first"} or \code{"last"} (c.f. \code{\link[=max.col]{max.col()}}) to determine how to deal with
 tied probabilities.}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Returns the object itself, but modified \strong{by reference}.
-You need to explicitly \verb{$clone()} the object beforehand if you want to keeps
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Returns the object itself, but modified \strong{by reference}.
+You need to explicitly \verb{$clone()} the object beforehand if you want to keep
 the object in its previous state.
+  }
 }
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-PredictionClassif-clone"></a>}}
 \if{latex}{\out{\hypertarget{method-PredictionClassif-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{PredictionClassif$clone(deep = FALSE)}\if{html}{\out{</div>}}
+\subsection{\code{PredictionClassif$clone()}}{
+  The objects of this class are cloneable with this method.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{PredictionClassif$clone(deep = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{deep}}{Whether to make a deep clone.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
-}
-}
 }

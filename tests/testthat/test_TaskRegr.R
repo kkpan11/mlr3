@@ -1,9 +1,9 @@
-test_that("Basic ops on BostonHousing task", {
-  task = tsk("boston_housing")
+test_that("Basic ops on Ames Housing task", {
+  task = tsk("california_housing")
   expect_task(task)
   expect_task_supervised(task)
   expect_task_regr(task)
-  expect_equal(task$target_names, "cmedv")
+  expect_equal(task$target_names, "median_house_value")
 
   f = task$formula()
   expect_class(f, "formula")
@@ -13,6 +13,11 @@ test_that("Basic ops on BostonHousing task", {
 test_that("Target is numeric", {
   b = as_data_backend(iris)
   expect_error(TaskRegr$new("iris", backend = b, target = "Species"), "Target column")
+})
+
+test_that("TaskRegr rejects NAs in target", {
+  dt = data.table::data.table(x = 1:10, y = c(NA_real_, 2:10))
+  expect_error(as_task_regr(dt, target = "y"), "must not contain missing values")
 })
 
 test_that("TaskRegr: 0 feature task", {
@@ -48,4 +53,25 @@ test_that("$add_strata", {
   task = TaskRegr$new("strata", tab, "y")
   task$add_strata(task$target_names, bins = 2)
   expect_identical(task$strata$N, c(50L, 10L))
+})
+
+test_that("offset column role works", {
+  task = tsk("mtcars")
+  expect_null(task$offset)
+  task$set_col_roles("am", "offset")
+
+  expect_subset("offset", task$properties)
+  expect_data_table(task$offset, nrows = task$nrow, ncols = 2)
+  expect_subset(c("row_id", "offset"), names(task$offset))
+
+  expect_error(
+    {
+      task$col_roles$offset = c("am", "gear")
+    },
+    "up to one"
+  )
+
+  task$col_roles$offset = character()
+  expect_true("offset" %nin% task$properties)
+  expect_null(task$offset)
 })

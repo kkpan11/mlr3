@@ -3,13 +3,24 @@ expect_hash_changes = function(x) {
   hash_before = x$hash
 
   x$id = "foo"
-  expect_false(identical(x$id, id_before))
+  testthat::expect_false(identical(x$id, id_before))
   if (!is.na(hash_before)) {
-    expect_false(identical(x$hash, hash_before))
+    testthat::expect_false(identical(x$hash, hash_before))
   }
   x$id = id_before
-  expect_true(identical(x$id, id_before))
-  expect_true(identical(x$hash, hash_before))
+  testthat::expect_identical(x$id, id_before)
+  testthat::expect_identical(x$hash, hash_before)
+  if ("use_weights" %in% names(x)) {
+    use_weights_before = x$use_weights
+    x$use_weights = "ignore"
+    testthat::expect_false(identical(x$use_weights, use_weights_before))
+    if (!is.na(hash_before)) {
+      testthat::expect_false(identical(x$hash, hash_before))
+    }
+    x$use_weights = use_weights_before
+    testthat::expect_identical(x$use_weights, use_weights_before)
+    testthat::expect_identical(x$hash, hash_before)
+  }
 }
 
 test_that("task$hash", {

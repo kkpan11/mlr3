@@ -12,52 +12,53 @@ test_that("no encapsulation", {
 
 test_that("no encapsulation / resampling", {
   learner = lrn("classif.debug", error_train = 1)
-  expect_error(resample(tsk("iris"), learner, rsmp("cv", folds = 3)), "classif.debug")
+  suppressWarnings(expect_error(resample(tsk("iris"), learner, rsmp("cv", folds = 3)), "classif.debug"))
 })
 
 
 test_that("encapsulation", {
   task = tsk("iris")
   learner = lrn("classif.debug")
-  learner$encapsulate = c(train = "evaluate", predict = "evaluate")
+  learner$encapsulate("evaluate", lrn("classif.featureless"))
+  expect_class(learner$fallback, "LearnerClassifFeatureless")
 
   learner$param_set$values = list(warning_train = 1)
   learner$train(task)
   expect_data_table(learner$log, min.rows = 1L)
-  expect_character(learner$warnings, len = 1L, any.missing = FALSE)
-  expect_character(learner$errors, len = 0L, any.missing = FALSE)
+  expect_class(learner$warnings[[1]], "Mlr3Warning")
+  expect_list(learner$errors, len = 0L)
 
   learner$param_set$values = list(error_train = 1)
   learner$train(task)
   expect_data_table(learner$log, min.rows = 1L)
-  expect_character(learner$warnings, len = 0L, any.missing = FALSE)
-  expect_character(learner$errors, len = 1L, any.missing = FALSE)
+  expect_list(learner$warnings, len = 0L, any.missing = FALSE)
+  expect_class(learner$errors[[1]], "Mlr3Error")
 
   learner$param_set$values = list(warning_predict = 1)
   learner$train(task)
   expect_data_table(learner$log, nrows = 0L)
-  expect_character(learner$warnings, len = 0L, any.missing = FALSE)
-  expect_character(learner$errors, len = 0L, any.missing = FALSE)
+  expect_list(learner$warnings, len = 0L)
+  expect_list(learner$errors, len = 0L)
   expect_prediction(learner$predict(task))
-  expect_character(learner$warnings, len = 1L, any.missing = FALSE)
-  expect_character(learner$errors, len = 0L, any.missing = FALSE)
+  expect_class(learner$warnings[[1]], "Mlr3Warning")
+  expect_list(learner$errors, len = 0L)
 
   learner$param_set$values = list(error_predict = 1)
   learner$train(task)
   expect_data_table(learner$log, nrows = 0L)
-  expect_character(learner$warnings, len = 0L, any.missing = FALSE)
-  expect_character(learner$errors, len = 0L, any.missing = FALSE)
-  expect_null(learner$predict(task))
-  expect_character(learner$warnings, len = 0L, any.missing = FALSE)
-  expect_character(learner$errors, len = 1L, any.missing = FALSE)
+  expect_list(learner$warnings, len = 0L)
+  expect_list(learner$errors, len = 0L)
+  learner$predict(task)
+  expect_list(learner$warnings, len = 0L)
+  expect_class(learner$errors[[1]], "Mlr3Error")
 })
-
 
 test_that("encapsulation / resample", {
   task = tsk("iris")
   learner = lrn("classif.debug")
   learner$param_set$values = list(warning_train = 1)
-  learner$encapsulate = c(train = "evaluate", predict = "evaluate")
+  learner$encapsulate("evaluate", lrn("classif.featureless"))
+  expect_class(learner$fallback, "LearnerClassifFeatureless")
 
   rr = resample(task, learner, rsmp("cv", folds = 3))
   expect_data_table(rr$warnings, nrows = 3L)
@@ -67,17 +68,14 @@ test_that("encapsulation / resample", {
   rr = resample(task, learner, rsmp("cv", folds = 3))
   expect_data_table(rr$warnings, nrows = 3L)
   expect_data_table(rr$errors, nrows = 3L)
-
-  m = msr("classif.ce")
-  expect_equal(unname(rr$aggregate(m)), NaN)
-  expect_equal(rr$score(msr("classif.ce"))$classif.ce, rep(NaN, 3L))
 })
 
 test_that("encapsulation / benchmark", {
   task = tsk("iris")
   learner = lrn("classif.debug")
   learner$param_set$values = list(warning_train = 1)
-  learner$encapsulate = c(train = "evaluate", predict = "evaluate")
+  learner$encapsulate("evaluate", lrn("classif.featureless"))
+  expect_class(learner$fallback, "LearnerClassifFeatureless")
 
   bmr = benchmark(benchmark_grid(task, learner, rsmp("cv", folds = 3)))
   aggr = bmr$aggregate(conditions = TRUE)

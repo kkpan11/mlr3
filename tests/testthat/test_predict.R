@@ -15,6 +15,15 @@ test_that("predict method works", {
   expect_true(uniqueN(predict(lrn, newdata, method = "mode")) == 1L)
 })
 
+test_that("predict method does not modify the learner", {
+  task = tsk("iris")
+  learner = lrn("classif.debug")$train(task)
+  values = learner$param_set$values
+
+  predict(learner, task$data(1:3), predict_missing = 0.5)
+  expect_equal(learner$param_set$values, values)
+})
+
 test_that("missing predictions are handled gracefully / classif", {
   task = tsk("sonar")
   learner = lrn("classif.debug", predict_missing = 1, predict_missing_type = "na", predict_type = "prob")
@@ -50,17 +59,39 @@ test_that("missing predictions are handled gracefully / regr", {
 
 
 test_that("predict_newdata with weights (#519)", {
-  task = tsk("boston_housing")
-  task$set_col_roles("nox", "weight")
+  # we had a problem where predict did not work if weights were present in the task
+  # especially with the "predict_newdata" function
+
+  task = tsk("california_housing")
+  task$set_col_roles("households", "weights_learner")
+  task$set_col_roles("total_rooms", "weights_measure")
   learner = lrn("regr.featureless")
   learner$train(task)
-  expect_prediction(learner$predict(task))
 
-  # w/o weights
-  expect_prediction(learner$predict_newdata(task$data()))
+  # predict with different API calls
+  # normal predict on the task
+  pred = learner$predict(task)
+  expect_prediction(pred)
+  expect_equal(pred$weights, tsk("california_housing")$data()$total_rooms)
+  # w/o weights in the new-df
+  pred = learner$predict_newdata(task$data())
+  expect_prediction(pred)
+  expect_null(pred$weights)
+  # w weights in the new-df
+  pred = learner$predict_newdata(task$data(cols = c(task$target_names, task$feature_names, "households")))
+  expect_prediction(pred)
+  expect_null(pred$weights)
 
-  # w weights
-  expect_prediction(learner$predict_newdata(task$data(cols = c(task$target_names, task$feature_names, "nox"))))
+  # now measure-weights are present
+  pred = learner$predict_newdata(task$data(cols = c(task$target_names, task$feature_names, "total_rooms")))
+  expect_prediction(pred)
+  expect_equal(pred$weights, tsk("california_housing")$data()$total_rooms)
+  # now both are present
+  pred = learner$predict_newdata(task$data(
+    cols = c(task$target_names, task$feature_names, "households", "total_rooms")
+  ))
+  expect_prediction(pred)
+  expect_equal(pred$weights, tsk("california_housing")$data()$total_rooms)
 })
 
 test_that("parallel predict works", {
@@ -72,9 +103,7 @@ test_that("parallel predict works", {
   p1 = lrn$predict(task, row_ids = 20:1)
 
   lrn$parallel_predict = TRUE
-  p2 = with_future(future::multisession,
-    lrn$predict(task, row_ids = 20:1)
-  )
+  p2 = with_future(future::multisession, lrn$predict(task, row_ids = 20:1))
 
   expect_equal(as.data.table(p1), as.data.table(p2))
 })

@@ -5,7 +5,6 @@
 #'
 #' @template param_rows
 #' @template param_cols
-#' @template param_data_format
 #' @template param_primary_key
 #' @template param_na_rm
 #'
@@ -27,7 +26,9 @@
 #'
 #' # alternative construction
 #' as_data_backend(palmerpenguins::penguins)
-DataBackendDataTable = R6Class("DataBackendDataTable", inherit = DataBackend,
+DataBackendDataTable = R6Class(
+  "DataBackendDataTable",
+  inherit = DataBackend,
   cloneable = FALSE,
   public = list(
     #' @field compact_seq `logical(1)`\cr
@@ -38,32 +39,32 @@ DataBackendDataTable = R6Class("DataBackendDataTable", inherit = DataBackend,
     #' @description
     #' Creates a new instance of this [R6][R6::R6Class] class.
     #'
-    #' Note that `DataBackendDataTable` does not copy the input data, while `as_data_backend()` calls [data.table::copy()].
+    #' Note that `DataBackendDataTable` does not copy the input data,
+    #' while `as_data_backend()` calls [data.table::copy()].
     #' `as_data_backend()` also takes care about casting to a `data.table()` and adds a primary key column if necessary.
     #'
     #' @param data ([data.table::data.table()])\cr
     #'   The input [data.table()].
     initialize = function(data, primary_key) {
       assert_data_table(data, col.names = "unique")
-      super$initialize(setkeyv(data, primary_key), primary_key, data_formats = "data.table")
+      super$initialize(setkeyv(data, primary_key), primary_key)
       ii = match(primary_key, names(data))
       if (is.na(ii)) {
-        stopf("Primary key '%s' not in 'data'", primary_key)
+        error_input("Primary key '%s' not in 'data'", primary_key)
       }
       private$.cache = set_names(replace(rep(NA, ncol(data)), ii, FALSE), names(data))
     },
 
     #' @description
-    #' Returns a slice of the data in the specified format.
-    #' Currently, the only supported formats are `"data.table"` and `"Matrix"`.
+    #' Returns a slice of the data.
     #' The rows must be addressed as vector of primary key values, columns must be referred to via column names.
-    #' Queries for rows with no matching row id and queries for columns with no matching column name are silently ignored.
+    #' Queries for rows with no matching row id and queries for columns with no matching column name are
+    #' silently ignored.
     #' Rows are guaranteed to be returned in the same order as `rows`, columns may be returned in an arbitrary order.
     #' Duplicated row ids result in duplicated rows, duplicated column names lead to an exception.
-    data = function(rows, cols, data_format = "data.table") {
+    data = function(rows, cols) {
       rows = assert_integerish(rows, coerce = TRUE)
       assert_names(cols, type = "unique")
-      assert_choice(data_format, self$data_formats)
       cols = intersect(cols, colnames(private$.data))
 
       if (self$compact_seq) {
@@ -122,7 +123,6 @@ DataBackendDataTable = R6Class("DataBackendDataTable", inherit = DataBackend,
         named_vector(names(missind), 0L),
         map_int(self$data(rows, names(query_cols)), count_missing)
       )
-
     }
   ),
 

@@ -2,21 +2,22 @@
 #'
 #' @format [environment].
 #' @description
-#' Environment which stores various information to allow objects to examine and introspect their structure and properties
-#' (c.f. [Reflections](https://www.wikiwand.com/en/Reflection_(computer_programming))).
+#' Environment which stores various information to allow objects to examine and introspect their
+#' structure and properties
+#' (c.f. [Reflections](https://en.wikipedia.org/wiki/Reflective_programming)).
 #'
 #' This environment be modified by third-party packages, e.g. by adding information about new task types
 #' or by extending the set of allowed feature types.
 #'
-#' The following objects are set by \CRANpkg{mlr3}:
+#' Third-party packages that modify the reflections must register themselves in the `loaded_packages` field.
 #'
-#' * `data_formats` (`character()`)\cr
-#'   Vectors of supported data formats, e.g. `"data.table"` or `"Matrix"`.
+#' The following objects are set by \CRANpkg{mlr3}:
 #'
 #' * `task_types` (`data.table()`)\cr
 #'   Table with task type (`"type"`), the implementing package (`"pkg"`), and the names of the generators
 #'   of the corresponding [Task] (`"task"`), [Learner] (`"learner"`),
-#'   [Prediction] (`"prediction"`) and [Measure] (`"measure"`).
+#'   [Prediction] (`"prediction"`), [Measure] (`"measure"`) and fallback [Learner].
+#'   The column `"type"` must be unique for each row.
 #'
 #' * `task_feature_types` (named `character()`)\cr
 #'   Vector of base R types supported as [Task] features, named with a 3 letter abbreviation.
@@ -46,16 +47,14 @@
 #' * `learner_predict_types` (list of list of `character()`)\cr
 #'   List of lists of supported [Learner] predict_types, named by their task type.
 #'   The inner list translates the `"predict_type"` to all predict types returned, e.g.
-#'   predict type `"prob"` for a [LearnerClassif] provides the probabilities as well as the predicted labels, therefore `"prob"` maps to `c("response", "prob")`.
-#'
-#' * `learner_predict_types` (list of list of `character()`)\cr
-#'   List of lists of supported [Learner] predict_types, named by their task type.
+#'   predict type `"prob"` for a [LearnerClassif] provides the probabilities as well as the
+#'   predicted labels, therefore `"prob"` maps to `c("response", "prob")`.
 #'
 #' * `learner_param_tags` (`character()`)\cr
 #'   Character vector of allowed 'tags' for the [paradox::ParamSet]s of a [Learner].
 #'
 #' * `predict_sets` (`character()`)\cr
-#'   Vector of possible predict sets. Currently supported are `"train"`, `"test"` and `"holdout"`.
+#'   Vector of possible predict sets. Currently supported are `"train"`, `"test"` and `"internal_valid"`.
 #'
 #' * `measure_properties` (list of `character()`)\cr
 #'   List of vectors of supported [Measure] properties, named by their task type.
@@ -77,42 +76,46 @@
 #' ls.str(mlr_reflections)
 mlr_reflections = new.env(parent = emptyenv())
 
-
 local({
-  ### DataBackend
-  mlr_reflections$data_formats = c(
-    "data.table", "Matrix"
-  )
-
   ### Task
   # task types + constructors
+  # nolint start
+  # fmt: skip
   mlr_reflections$task_types = rowwise_table(.key = "type",
     ~type,          ~package, ~task,              ~learner,         ~prediction,          ~prediction_data,         ~measure,
     "regr",         "mlr3",   "TaskRegr",         "LearnerRegr",    "PredictionRegr",     "PredictionDataRegr",     "MeasureRegr",
     "classif",      "mlr3",   "TaskClassif",      "LearnerClassif", "PredictionClassif",  "PredictionDataClassif",  "MeasureClassif",
     "unsupervised", "mlr3",   "TaskUnsupervised", "Learner",        NA_character_,        NA_character_,            NA_character_
   )
+  # nolint end
 
   mlr_reflections$task_feature_types = c(
-    lgl = "logical", int = "integer", dbl = "numeric", chr = "character", fct = "factor", ord = "ordered", pxc = "POSIXct"
+    lgl = "logical",
+    int = "integer",
+    dbl = "numeric",
+    chr = "character",
+    fct = "factor",
+    ord = "ordered",
+    pxc = "POSIXct",
+    dte = "Date"
   )
 
   mlr_reflections$task_row_roles = c(
-    "use", "test", "holdout"
+    "use"
   )
 
-  tmp = c("feature", "target", "name", "order", "stratum", "group", "weight")
+  tmp = c("feature", "target", "name", "order", "stratum", "group", "offset", "weights_learner", "weights_measure")
   mlr_reflections$task_col_roles = list(
     regr = tmp,
     classif = tmp,
     unsupervised = c("feature", "name", "order")
   )
 
-  tmp = c("strata", "groups", "weights")
+  tmp = c("strata", "groups", "offset", "weights_learner", "weights_measure")
   mlr_reflections$task_properties = list(
     classif = c(tmp, "twoclass", "multiclass"),
     regr = tmp,
-    unsupervised = character(0)
+    unsupervised = character()
   )
 
   mlr_reflections$task_mandatory_properties = list(
@@ -121,11 +124,38 @@ local({
 
   mlr_reflections$task_print_col_roles = list(
     before = character(),
-    after = c("Order by" = "order", "Strata" = "stratum", "Groups" = "group", "Weights" = "weight")
+    after = c(
+      "Order by" = "order",
+      "Strata" = "stratum",
+      "Groups" = "group",
+      "Offset" = "offset",
+      "Weights/Learner" = "weights_learner",
+      "Weights/Measure" = "weights_measure"
+    )
+  )
+
+  tmp = c("weights_learner", "weights_measure", "name", "order", "stratum", "group")
+  mlr_reflections$task_col_roles_optional_newdata = list(
+    classif = tmp,
+    regr = tmp
   )
 
   ### Learner
-  tmp = c("featureless", "missings", "weights", "importance", "selected_features", "oob_error", "loglik", "hotstart_forward", "hotstart_backward", "marshal")
+  tmp = c(
+    "featureless",
+    "missings",
+    "weights",
+    "importance",
+    "selected_features",
+    "oob_error",
+    "hotstart_forward",
+    "hotstart_backward",
+    "validation",
+    "internal_tuning",
+    "marshal",
+    "offset",
+    "new_levels"
+  )
   mlr_reflections$learner_properties = list(
     classif = c(tmp, "twoclass", "multiclass"),
     regr = tmp
@@ -133,18 +163,44 @@ local({
 
   mlr_reflections$learner_predict_types = list(
     classif = list(response = "response", prob = c("response", "prob")),
-    regr = list(response = "response", se = c("response", "se"), distr = c("response", "se", "distr"))
+    regr = list(
+      response = "response",
+      se = c("response", "se"),
+      quantiles = c("response", "quantiles"),
+      distr = c("response", "se", "distr")
+    ),
+    unsupervised = NULL
   )
 
   # Allowed tags for parameters
-  mlr_reflections$learner_param_tags = c("train", "predict", "hotstart", "importance", "threads", "required")
+  mlr_reflections$learner_param_tags = c(
+    "train",
+    "predict",
+    "hotstart",
+    "importance",
+    "threads",
+    "required",
+    "internal_tuning"
+  )
 
   ### Prediction
-  mlr_reflections$predict_sets = c("train", "test", "holdout")
+  mlr_reflections$predict_sets = c("train", "test", "internal_valid")
 
+  ### Resampling
+  mlr_reflections$resampling_properties = c("duplicated_ids", "weights")
 
   ### Measures
-  tmp = c("na_score", "requires_task", "requires_learner", "requires_model", "requires_train_set")
+  tmp = c(
+    "na_score",
+    "requires_task",
+    "requires_learner",
+    "requires_model",
+    "requires_train_set",
+    "weights",
+    "primary_iters",
+    "requires_no_prediction",
+    "obs_loss"
+  )
   mlr_reflections$measure_properties = list(
     classif = tmp,
     regr = tmp
@@ -157,11 +213,11 @@ local({
   )
 
   ### ResampleResult
-  mlr_reflections$rr_names = c("task", "learner", "resampling", "iteration", "prediction")
+  mlr_reflections$rr_names = c("task", "learner", "resampling", "iteration")
 
-  ### Logger
-  mlr_reflections$loggers = list()
-
-  ### cache package version
+  ### Cached package version
   mlr_reflections$package_version = packageVersion("mlr3")
+
+  ### Loaded packages
+  mlr_reflections$loaded_packages = "mlr3"
 })

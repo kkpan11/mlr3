@@ -2,8 +2,7 @@
 #'
 #' @description
 #' Wraps a [DataBackend] around data.
-#' \CRANpkg{mlr3} ships with methods for `data.frame` (converted to a [DataBackendDataTable]
-#' and `Matrix` from package \CRANpkg{Matrix} (converted to a [DataBackendMatrix]).
+#' \CRANpkg{mlr3} ships with methods for `data.frame` (converted to a [DataBackendDataTable].
 #'
 #' Additional methods are implemented in the package \CRANpkg{mlr3db}, e.g. to connect
 #' to real DBMS like PostgreSQL (via \CRANpkg{dbplyr}) or DuckDB (via \CRANpkg{DBI}/\CRANpkg{duckdb}).
@@ -12,8 +11,6 @@
 #'   Data to create a [DataBackend] from.
 #'   For a `data.frame()` (this includes `tibble()` from \CRANpkg{tibble} and [data.table::data.table()]),
 #'   a [DataBackendDataTable] is created.
-#'   For objects of type `Matrix` (from package \CRANpkg{Matrix}), a [DataBackendMatrix] is returned.
-#'   See `methods("as_data_backend")` for all possible input formats.
 #'
 #' @template param_primary_key
 #'
@@ -33,7 +30,8 @@ as_data_backend = function(data, primary_key = NULL, ...) {
 
 
 #' @export
-as_data_backend.DataBackend = function(data, primary_key = NULL, ...) { # nolint
+# nolint next
+as_data_backend.DataBackend = function(data, primary_key = NULL, ...) {
   data
 }
 
@@ -45,12 +43,14 @@ as_data_backend.DataBackend = function(data, primary_key = NULL, ...) { # nolint
 #' @param keep_rownames (`logical(1)` | `character(1)`)\cr
 #'   If `TRUE` or a single string, keeps the row names of `data` as a new column.
 #'   The column is named like the provided string, defaulting to `"..rownames"` for `keep_rownames == TRUE`.
-#'   Note that the created column will be used as a regular feature by the task unless you manually change the column role.
+#'   Note that the created column will be used as a regular feature by the task
+#'   unless you manually change the column role.
 #'   Also see [data.table::as.data.table()].
 #'
 #' @rdname as_data_backend
 #' @export
-as_data_backend.data.frame = function(data, primary_key = NULL, keep_rownames = FALSE, ...) { # nolint
+# nolint next
+as_data_backend.data.frame = function(data, primary_key = NULL, keep_rownames = FALSE, ...) {
   assert_data_frame(data, min.cols = 1L, col.names = "unique")
 
   if (!isFALSE(keep_rownames)) {
@@ -75,7 +75,7 @@ as_data_backend.data.frame = function(data, primary_key = NULL, keep_rownames = 
     } else if (is.integer(primary_key)) {
       row_ids = assert_integer(primary_key, len = nrow(data), any.missing = FALSE, unique = TRUE)
     } else {
-      stopf("Argument 'primary_key' must be NULL, a column name or a vector of ids")
+      error_input("Argument 'primary_key' must be NULL, a column name or a vector of ids")
     }
 
     primary_key = "..row_id"

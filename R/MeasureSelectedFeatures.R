@@ -24,20 +24,22 @@
 #'
 #' scores = rr$score(msr("selected_features"))
 #' scores[, c("iteration", "selected_features")]
-MeasureSelectedFeatures = R6Class("MeasureSelectedFeatures",
+MeasureSelectedFeatures = R6Class(
+  "MeasureSelectedFeatures",
   inherit = Measure,
   public = list(
     #' @description
     #' Creates a new instance of this [R6][R6::R6Class] class.
     initialize = function() {
       param_set = ps(normalize = p_lgl(tags = "required"))
-      param_set$values = list(normalize = FALSE)
+      param_set$set_values(normalize = FALSE)
 
       super$initialize(
         id = "selected_features",
         param_set = param_set,
         task_type = NA_character_,
-        properties = c("requires_task", "requires_learner", "requires_model"),
+        properties = c("requires_task", "requires_learner", "requires_model", "requires_no_prediction"),
+        predict_sets = NULL,
         predict_type = NA_character_,
         range = c(0, Inf),
         minimize = TRUE,
@@ -59,7 +61,7 @@ MeasureSelectedFeatures = R6Class("MeasureSelectedFeatures",
         n = n / length(task$feature_names)
       }
 
-      return(n)
+      n
     }
   )
 )

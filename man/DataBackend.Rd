@@ -10,10 +10,9 @@ Data backends provide a layer of abstraction for various data storage systems.
 It is not recommended to work directly with the DataBackend.
 Instead, all data access is handled transparently via the \link{Task}.
 
-This package comes with two implementations for backends:
+This package currently ships with one implementation for backends:
 \itemize{
 \item \link{DataBackendDataTable} which stores the data as \code{\link[data.table:data.table]{data.table::data.table()}}.
-\item \link{DataBackendMatrix} which stores the data as sparse \code{\link[Matrix:sparseMatrix]{Matrix::sparseMatrix()}}.
 }
 
 To connect to out-of-memory database management systems such as SQL servers,
@@ -21,8 +20,7 @@ see the extension package \CRANpkg{mlr3db}.
 }
 \details{
 The required set of fields and methods to implement a custom \code{DataBackend} is
-listed in the respective sections (see \link{DataBackendDataTable} or
-\link{DataBackendMatrix} for exemplary implementations of the interface).
+listed in the respective sections (see \link{DataBackendDataTable}).
 }
 \examples{
 data = data.table::data.table(id = 1:5, x = runif(5),
@@ -43,102 +41,98 @@ b$missings(rows = b$rownames, cols = names(data))
 e.g. SQL servers or \CRANpkg{duckdb}.
 }
 
-Other DataBackend: 
+Other DataBackend:
 \code{\link{DataBackendDataTable}},
-\code{\link{DataBackendMatrix}},
-\code{\link{as_data_backend.Matrix}()}
+\code{\link[=as_data_backend]{as_data_backend()}}
 }
 \concept{DataBackend}
 \section{Public fields}{
-\if{html}{\out{<div class="r6-fields">}}
-\describe{
-\item{\code{primary_key}}{(\code{character(1)})\cr
+  \if{html}{\out{<div class="r6-fields">}}
+  \describe{
+    \item{\code{primary_key}}{(\code{character(1)})\cr
 Column name of the primary key column of positive and unique integer row ids.}
-
-\item{\code{data_formats}}{(\code{character()})\cr
-Set of supported formats, e.g. \code{"data.table"} or \code{"Matrix"}.}
-}
-\if{html}{\out{</div>}}
+  }
+  \if{html}{\out{</div>}}
 }
 \section{Active bindings}{
-\if{html}{\out{<div class="r6-active-bindings">}}
-\describe{
-\item{\code{hash}}{(\code{character(1)})\cr
+  \if{html}{\out{<div class="r6-active-bindings">}}
+  \describe{
+    \item{\code{hash}}{(\code{character(1)})\cr
 Hash (unique identifier) for this object.}
 
-\item{\code{col_hashes}}{(named \code{character})\cr
+    \item{\code{col_hashes}}{(named \code{character})\cr
 Hash (unique identifier) for all columns except the \code{primary_key}: A \code{character} vector, named by the columns that each element refers to.\cr
 Columns of different \code{\link{Task}}s or \code{\link{DataBackend}}s that have agreeing \code{col_hashes} always represent the same data, given that the same \code{row}s are selected.
 The reverse is not necessarily true: There can be columns with the same content that have different \code{col_hashes}.}
-}
-\if{html}{\out{</div>}}
+  }
+  \if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
-\itemize{
-\item \href{#method-DataBackend-new}{\code{DataBackend$new()}}
-\item \href{#method-DataBackend-format}{\code{DataBackend$format()}}
-\item \href{#method-DataBackend-print}{\code{DataBackend$print()}}
-}
+  \itemize{
+    \item \href{#method-DataBackend-initialize}{\code{DataBackend$new()}}
+    \item \href{#method-DataBackend-format}{\code{DataBackend$format()}}
+    \item \href{#method-DataBackend-print}{\code{DataBackend$print()}}
+  }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-DataBackend-new"></a>}}
-\if{latex}{\out{\hypertarget{method-DataBackend-new}{}}}
-\subsection{Method \code{new()}}{
-Creates a new instance of this \link[R6:R6Class]{R6} class.
+\if{html}{\out{<a id="method-DataBackend-initialize"></a>}}
+\if{latex}{\out{\hypertarget{method-DataBackend-initialize}{}}}
+\subsection{\code{DataBackend$new()}}{
+  Creates a new instance of this \link[R6:R6Class]{R6} class.
 
 Note: This object is typically constructed via a derived classes, e.g.
-\link{DataBackendDataTable} or \link{DataBackendMatrix}, or via the S3 method
+\link{DataBackendDataTable}, or via the S3 method
 \code{\link[=as_data_backend]{as_data_backend()}}.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{DataBackend$new(data, primary_key, data_formats = "data.table")}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{data}}{(any)\cr
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{DataBackend$new(data, primary_key)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{data}}{(any)\cr
 The format of the input data depends on the specialization. E.g.,
-\link{DataBackendDataTable} expects a \code{\link[data.table:data.table]{data.table::data.table()}} and
-\link{DataBackendMatrix} expects a \code{\link[Matrix:Matrix]{Matrix::Matrix()}} from \CRANpkg{Matrix}.}
-
-\item{\code{primary_key}}{(\code{character(1)})\cr
+\link{DataBackendDataTable} expects a \code{\link[data.table:data.table]{data.table::data.table()}}.}
+      \item{\code{primary_key}}{(\code{character(1)})\cr
 Each DataBackend needs a way to address rows, which is done via a
 column of unique integer values, referenced here by \code{primary_key}. The
 use of this variable may differ between backends.}
+    }
+    \if{html}{\out{</div>}}
+  }
+}
 
-\item{\code{data_formats}}{(\code{character()})\cr
-Set of supported data formats which can be processed during \verb{$train()} and \verb{$predict()},
-e.g. \code{"data.table"}.}
-}
-\if{html}{\out{</div>}}
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-DataBackend-format"></a>}}
 \if{latex}{\out{\hypertarget{method-DataBackend-format}{}}}
-\subsection{Method \code{format()}}{
-Helper for print outputs.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{DataBackend$format(...)}\if{html}{\out{</div>}}
+\subsection{\code{DataBackend$format()}}{
+  Helper for print outputs.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{DataBackend$format(...)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{...}}{(ignored).}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{...}}{(ignored).}
-}
-\if{html}{\out{</div>}}
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-DataBackend-print"></a>}}
 \if{latex}{\out{\hypertarget{method-DataBackend-print}{}}}
-\subsection{Method \code{print()}}{
-Printer.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{DataBackend$print()}\if{html}{\out{</div>}}
+\subsection{\code{DataBackend$print()}}{
+  Printer.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{DataBackend$print()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 }

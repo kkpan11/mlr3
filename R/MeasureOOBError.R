@@ -13,7 +13,8 @@
 #'
 #' @template seealso_measure
 #' @export
-MeasureOOBError = R6Class("MeasureOOBError",
+MeasureOOBError = R6Class(
+  "MeasureOOBError",
   inherit = Measure,
   public = list(
     #' @description
@@ -22,7 +23,8 @@ MeasureOOBError = R6Class("MeasureOOBError",
       super$initialize(
         id = "oob_error",
         task_type = NA_character_,
-        properties = c("na_score", "requires_learner"),
+        properties = c("na_score", "requires_learner", "requires_no_prediction"),
+        predict_sets = NULL,
         predict_type = NA_character_,
         range = c(-Inf, Inf),
         minimize = TRUE,
@@ -38,8 +40,12 @@ MeasureOOBError = R6Class("MeasureOOBError",
       if ("oob_error" %nin% learner$properties) {
         return(NA_real_)
       }
+      # prefer value captured during training in learner$state to avoid requiring stored models
+      if (!is.null(learner$state$oob_error)) {
+        return(learner$state$oob_error)
+      }
 
-      return(learner$oob_error())
+      learner$oob_error()
     }
   )
 )

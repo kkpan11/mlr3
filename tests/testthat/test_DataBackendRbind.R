@@ -17,12 +17,10 @@ test_that("DataBackendRbind", {
   x = b$missings(b$rownames, c("Petal.Width", "Petal.Length"))
   expect_equal(x, set_names(c(0L, 30L), c("Petal.Width", "Petal.Length")))
 
-
   # all col-hashes are mutually disjoint
-  expect_true(length(intersect(b1$col_hashes, b2$col_hashes)) == 0)
-  expect_true(length(intersect(b$col_hashes, b1$col_hashes)) == 0)
-  expect_true(length(intersect(b$col_hashes, b2$col_hashes)) == 0)
-
+  expect_length(intersect(b1$col_hashes, b2$col_hashes), 0)
+  expect_length(intersect(b$col_hashes, b1$col_hashes), 0)
+  expect_length(intersect(b$col_hashes, b2$col_hashes), 0)
 })
 
 test_that("Backends with different cols", {
@@ -42,25 +40,6 @@ test_that("Backends with different cols", {
   expect_data_table(h, ncols = 4, nrows = 120)
 
   expect_data_table(b$data(rows = 1:120, cols = b$colnames), nrows = 120, ncols = 4)
-})
-
-test_that("Backends with mixed data_formats", {
-  requireNamespace("Matrix")
-  i = c(1, 3:8, 20)
-  j = c(2, 9, 6:10, 5)
-  x = 7 * (1:8)
-  A = Matrix::sparseMatrix(i, j, x = x)
-  colnames(A) = letters[1:10]
-  X = cbind(A, Y = rnorm(nrow(A)))
-  task = TaskRegr$new("sparse", X, "Y")
-
-  newdata = as.data.frame(as.list(set_names(rep(0, ncol(X)), colnames(X))))
-  task$rbind(newdata)
-  expect_backend(task$backend)
-  expect_set_equal(task$backend$data_formats, "data.table")
-
-  rr = resample(task, lrn("regr.rpart"), rsmp("holdout"))
-  expect_number(rr$aggregate(msr("regr.mse")))
 })
 
 test_that("Backends with same rows", {

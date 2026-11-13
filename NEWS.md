@@ -1,5 +1,275 @@
 # mlr3 (development version)
 
+* BREAKING CHANGE: `as_task_classif()` and `as_task_regr()` now raise an error if the target column contains missing values instead of showing a message (#1442).
+* fix: Mutating a shallow clone of a task via `$rename()`, `$set_levels()`, `$droplevels()`, `$cbind()`, `$labels`, or `$positive` no longer modifies the column information of the original task.
+* fix: Errors caused by prior misconfiguration (e.g., predicting with an untrained learner, uninstantiated resamplings, missing stored models or backends, and unsupported predict types) now signal `Mlr3ErrorConfig` instead of `Mlr3ErrorInput`, so they are no longer masked by fallback learners under encapsulation (#1500).
+* fix: `LearnerRegr`'s `$hash` and `$phash` now include `$quantiles` and `$quantile_response`, so learners predicting different quantiles are no longer treated as identical, e.g., when combining resample results (#1518).
+  Subclasses of `Learner` can now add fields to the hash via the private field `$.extra_hash`.
+* fix: `as_prediction_classif()` and `as_prediction_regr()` now store all columns that are not reserved prediction columns as extra data, so predictions with extra data survive the round trip through `as.data.table()`.
+  `as_prediction_regr()` now also reconstructs quantile predictions from columns named `q<prob>` and raises an error for tables with a `distr` column.
+  `PredictionClassif` and `PredictionRegr` now reject extra data whose names collide with reserved prediction columns (#1517).
+* fix: `PredictionClassif` now raises an error if the predicted response contains labels that are not class labels of the task, instead of silently converting them to missing values.
+* fix: `Learner$predict()` on a `TaskUnsupervised` now returns the predicted classes of a classification learner instead of only missing values, and no longer errors with predict type `"prob"`.
+* fix: `PredictionRegr$filter()` and `c()` with `keep_duplicates = FALSE` now also subset the distributions of predictions with predict type `"distr"`, which previously kept the distributions of all rows (#1400).
+* fix: `c()` now aligns the probability columns of `PredictionClassif` objects by class label, so combining predictions with a different order of the class levels, e.g., from tasks with a different positive class, no longer swaps the probabilities.
+  Combining classification predictions with different class labels or regression predictions with different quantiles now raises an error.
+* fix: `PredictionClassif` now raises an error for probability matrices without column names or with duplicated column names, instead of silently replacing all probabilities with zero and drawing a random response.
+* fix: Predicting zero rows with a `LearnerRegr` with predict type `"quantiles"` now returns a prediction with an empty quantiles matrix, so it can be combined with other quantile predictions, e.g., in `resample()` with an empty test set.
+* fix: `PredictionClassif$set_threshold()` with a vector of thresholds now keeps the response of observations with missing probabilities missing, instead of assigning a random class label.
+* fix: `PredictionRegr` now checks that `truth` is numeric and has one element per observation.
+  A missing `truth` is now replaced by one missing value per observation instead of a single missing value.
+* fix: `PredictionRegr` now checks that the quantiles matrix is numeric, that its `probs` attribute matches the number of columns and is unique, and that the quantile response is one of the predicted quantiles.
+* fix: `Learner$encapsulate()`: a `when` handler now also decides for errors of class `Mlr3ErrorConfig`, which previously always errored even when a handler was registered (#1500).
+* fix: `Task$rbind()` now invalidates `$row_hash` and `$col_hashes`, so `resample()` and `benchmark()` detect resamplings instantiated before the rows were added.
+  `$materialize_view()`, `$labels`, `$col_info`, `$backend`, `$extra_args`, and `TaskClassif$positive` now invalidate the cached task hash, and `$extra_args` is now part of the task hash.
+* fix: `resample()` and `benchmark()` with `allow_hotstart = TRUE` no longer carry over the prediction time, validation scores, fallback state, and task copies of the start learner into the hotstarted learner, which inflated `msr("time_predict")` (#1504).
+* fix: `Task$set_row_roles()` now stores row ids as integers, so the same set of rows no longer results in different task hashes depending on the type of the passed row ids.
+  Assigning to `$row_roles` now raises an error for row ids that do not exist in the backend.
+* fix: Callbacks now receive the model in unmarshaled form in the `on_resample_end` stage of `resample()` and `benchmark()`, regardless of `unmarshal`, `store_models`, and the execution mode (#1509).
+* fix: `learner_predict()` now invalidates the cached task hash when subsetting to the predict rows, so `task$hash` is correct inside `.predict()` and `resample()` no longer stores a wrong task hash when a learner reads the hash during prediction (#1503).
+* fix: `benchmark()` now accepts a plain `data.frame` as `design`, as documented, instead of failing with "replacement has 0 rows" (#1505).
+* fix: `Task$cbind()` now raises an error if `data` does not contain all rows of the task, instead of silently filling the new columns with missing values.
+  Columns that already have a role other than `"feature"` keep their roles instead of additionally becoming features.
+  `$cbind()` and `$rbind()` now check the column roles when they modify columns with a role, e.g., rejecting negative weights, and leave the task unchanged if the check fails.
+* fix: The option `mlr3.exec_random` now actually randomizes the execution order of `resample()` and `benchmark()` iterations when parallelizing with `future`. The random ordering was silently ignored because it was attached to `future.scheduling` while `future.chunk.size` was always set (#1508).
+* fix: `Task$set_levels()` now raises an error for columns that are not factors and for duplicated or missing levels, instead of silently converting the column to a factor in `$data()`.
+  `Task$set_col_roles()` now rejects the primary key, like `$col_roles`.
+  `Task$task_type` can only be set to a task type whose task class the task inherits from.
+  Invalid offset column names of multiclass tasks now raise an `Mlr3ErrorInput` instead of a testthat expectation failure.
+* perf: `Learner$predict()` now calls `as_prediction()` with `check = FALSE`, so prediction data is no longer checked twice for task types whose `as_prediction()` method defaults to `check = TRUE`.
+* fix: `resample()` and `benchmark()` with `encapsulate` now keep a fallback learner that is already configured instead of replacing it with the default fallback.
+  `encapsulate = "none"` no longer fails with "Could not find default fallback learner" (#1521).
+* fix: `resample()` and `benchmark()` now accept `encapsulate = "mirai"` (#1506).
+* fix: `resample()` and `benchmark()` now re-raise errors from the workers when parallelizing with `mirai` instead of failing with "subscript out of bounds" (#1502).
+* fix: `PredictionRegr$new()` now returns the correct response for quantile predictions when the `response` attribute of `quantiles` is given as a probability (#1517).
+* fix: Assigning row ids to `Task$internal_valid_task` now raises an error for row ids that are not in `$row_ids` and no longer removes duplicated training rows.
+  Assigning an object that is not a task now raises an informative error, and `$internal_valid_task` is returned visibly.
+* fix: `LearnerClassif$predict_newdata_fast()` now passes the positive and negative class to the learner, so binary learners such as `classif.log_reg` no longer return unnamed and possibly swapped probability columns (#1520).
+  It also passes the task type properties, so `classif.gbm` and `classif.fnn` no longer fail and `classif.lightgbm` no longer returns a wrongly shaped probability matrix for multiclass tasks.
+* fix: `predict.Learner()` no longer modifies the hyperparameters of the passed learner when additional parameters are supplied via `...` (#1501).
+* fix: `PredictionRegr$filter()` and `c()` with `keep_duplicates = FALSE` now keep the `probs` and `response` attributes of the quantile matrix, so quantile measures such as `msr("regr.pinball")` no longer fail on filtered predictions.
+* fix: `PredictionRegr$new()` now takes the quantile response from the checked prediction data, so a numeric `response` attribute on `quantiles` no longer results in an empty `$response` and failing scores.
+* fix: `PredictionRegr$new()` and `as_prediction()` with `check = TRUE` no longer fail with "invalid format '%g'" on quantile prediction data that has already been checked, e.g., the `$data` of an existing prediction.
+* fix: `Learner$hash` and `Learner$phash` now include the timeout, the deadline, the encapsulation method, and the `when` handler, so all learner hashes change. Previously, `benchmark()` merged learners that differed only in these settings and ran them with the settings of the first one (#1511).
+* fix: `Learner$predict()` and `Learner$predict_newdata_fast()` no longer change the predict type of the stored fallback learner when the fallback is used, so `$hash` stays constant after predicting and `HotstartStack` and `BenchmarkResult` keep finding the learner by its hash.
+* fix: `LearnerClassif$predict_newdata_fast()` now imputes missing responses by class label, so a fallback learner returning a factor no longer inserts integer codes into a character response.
+* fix: `Learner$new()` now checks that `param_set` is a `ParamSet` instead of failing later with "attempt to apply non-function".
+* fix: `Learner$task_type` of a learner that inherits from a task type specific class like `LearnerClassif` can only be set to a task type whose learner class the learner inherits from, so a `LearnerClassif` can no longer be turned into a `"regr"` learner that trains on a numeric target and fails at predict time.
+* fix: `Learner$print()` now shows the messages of logged warnings and errors instead of the deparsed condition objects.
+* fix: `LearnerRegr$quantiles` now resets `$quantile_response` when the new quantiles do not contain it, so predicting no longer fails with "subscript out of bounds" when accessing `$response`, and rejects duplicated quantiles.
+* fix: `Learner$predict()` with `parallel_predict = TRUE` now keeps the log entries and the predict time recorded by the workers, so `$warnings`, `$errors`, and `$timings` are no longer empty after a parallel prediction, and returns an empty prediction instead of `NULL` for zero row ids.
+* fix: `Learner$encapsulate()` now validates all arguments before changing the learner, so a failed call no longer changes `$hash`, raises an error if the fallback learner does not support the `$predict_type` of the learner instead of failing later during prediction, and rejects a `when` handler together with `method = "none"`.
+
+# mlr3 1.8.0
+
+* feat: Added `msr("best_valid_score")` (`mlr_measures_best_valid_score`), which reports the *best* internal validation score observed during training/
+* feat: Added the `diabetes` task (`mlr_tasks_diabetes`) for the synthetic `mlbench::SynthDiabetes2` data set, which has the same structure as the former `pima` task including missing values, for use in examples and tests.
+* BREAKING CHANGE: Removed the `pima` task (`mlr_tasks_pima`) because the `PimaIndiansDiabetes2` data set was removed from the `mlbench` package, use `tsk("diabetes")` instead.
+* perf: `TaskClassif$print()` now caches the class distribution of the target column and only recomputes it when the task hash changes.
+  Querying the target column can be slow for tasks with many rows.
+
+# mlr3 1.7.1
+
+* fix: `Learner$new()` and the `$deadline` setter now pass `origin` to `as.POSIXct()`, fixing learner construction and numeric deadline assignment on R versions below 4.3.
+* fix: The `Learner$deadline` setter now merges partial assignments instead of overwriting the whole field and validates the input as a named `POSIXct`, so setting only `train` or `predict` no longer drops the other entry or crashes at predict time.
+* fix: `Learner$predict_newdata_fast()` now restores the fallback learner's state and predict type from the main learner before delegating, so it works after `resample()` and `benchmark()` where the fallback object itself carries no trained state or a mismatched predict type.
+It also aligns the fallback's probability columns by class name so imputed predictions are no longer silently misassigned.
+* fix: `Learner$predict_newdata_fast()` now raises a clear error when the learner has not been trained yet instead of failing with a cryptic error from the underlying predict method.
+
+# mlr3 1.7.0
+
+* BREAKING CHANGE: Removed the deprecated `Task$divide()` method, use the `$internal_valid_task` field instead.
+* feat: Encapsulated Learners now support a `deadline` (date-time) in addition to the existing `timeout` (seconds).
+* perf: Vectorized the row-wise `NA` check in the prediction fallback path.
+* refactor: Removed unused `task_prototype` from the learner state.
+* fix: `as_measures()` now forwards `task_type` when converting a list.
+* fix: `as_task_classif()` and `as_task_regr()` now respect the `drop_original_target` and `drop_levels` arguments when converting a task instead of ignoring them.
+* fix: `as_tasks_unsupervised()` now correctly converts lists to `TaskUnsupervised`s.
+* fix: `c()` on regression `Prediction`s no longer drops the `probs` attribute of the combined `quantiles` matrix.
+* fix: `importance()` and `selected_features()` now raise a learner error instead of an input error when the model is not trained yet.
+* fix: `Measure$obs_loss()` now forwards the `learner` argument to the private `.obs_loss()` method instead of dropping it.
+* fix: `Measure$score()` no longer errors during the `task_type` check when `prediction` is `NULL`.
+* fix: Reset range of `MeasureClassifCost`.
+* fix: `MeasureClassifSimple` and `MeasureRegrSimple` now forward their hyperparameter values to the underlying scoring function instead of ignoring them.
+* fix: `mlr_measures_regr.aic` now accepts non-integer values for `k` by changing the parameter from an integer to a double.
+* fix: `MeasureRegrPinball` now declares the `"weights"` property and forwards sample weights to the underlying scoring function.
+* fix: `MeasureSimilarity$new()` no longer accepts the silently ignored `average` argument.
+* fix: `ResamplingCustom` and `ResamplingCustomCV` now invalidate the cached `$hash` on re-instantiation.
+* fix: `Task$hash` is now read-only.
+* fix: `TaskClassif$droplevels()` now forwards the `cols` argument to the parent method instead of dropping levels on all columns.
+* fix: The predict path now raises a learner-predict error instead of a learner-train error.
+* fix: Validation of the weights columns now uses the backend row names instead of a row sequence, fixing checks on tasks with non-contiguous row ids.
+
+# mlr3 1.6.0
+
+* feat: `Learner` gains a `predict_raw` flag and `Prediction` gains a `raw` field to store the raw prediction object from the upstream model alongside standardized predictions.
+* fix: IDs containing `%` (e.g., from `deparse1(substitute(x))` with pipe expressions) now produce a clear error instead of causing cryptic `sprintf` failures downstream (#1461).
+* fix: `Learner$predict_newdata()` now preserves the target's factor level ordering from training, fixing inverted probabilities for binary classification when the positive class was not the first alphabetical level (#1459).
+
+# mlr3 1.5.0
+
+* feat: Replace messages with conditions in logs.
+
+# mlr3 1.4.0
+
+* feat: Add `$native_model` active binding to `Learner` to access the model from the upstream package.
+* feat: Learner store the condition of warnings and errors in the `log` field.
+* feat: No supervised tasks with missing target values are allowed anymore.
+* refactor: Validate the input of fields.
+* fix: Assert list input in `assert_learners`, `assert_tasks`, `assert_measures` and `assert_resamplings`.
+* fix: `convert_task` converts the internal validation task now.
+* fix: disable printing of class ratios for large tasks.
+* fix: Make quantiles resettable.
+
+# mlr3 1.3.0
+
+* feat: `Learner$predict()` can now add additional data to `PredictionClassif` and `PredictionRegr` objects via the `extra` field.
+* feat: `Mlr3Error` and `Mlr3Warning` classes for errors and warnings.
+* refactor: `$obs_loss` methods in `Measure`, `Prediction`, `ResampleResult`, and `BenchmarkResult`.
+* perf: Use more `lengths()` and `data.table::setattr()` in tests.
+* perf: Use `attr()` instead of `attributes()` for extracting single attributes.
+* test: Use more specialized test functions.
+* fix: `weights_measure` now work with `stratum`.
+* fix: Encapsulation loads loaded packages on the workers.
+* fix: Learners can handle new factor levels.
+* refactor: Use more implicit returns.
+* feat: Learner can pass extra data to predictions.
+
+# mlr3 1.2.0
+
+* feat: Add `mirai` support for parallelization and encapsulation.
+* feat: Fallback can now be configured to only be used in case of certain errors via the `when` argument.
+* feat: Custom error and warning classes.
+* fix: `$selected_features` returns error when model is not trained yet.
+* docs: Missing values during scoring.
+* BREAKING CHANGE: Removed `data_format` argument of `$data()` method of `DataBackend`.
+* BREAKING CHANGE: Remove `data_formats` field from `Learner`.
+* BREAKING CHANGE: Remove `DataBackendMatrix` class.
+* feat: Add `materialize_view()` method to `Task` to replace the internal `DataBackend` with a new one after operations like `$select()` and `$filter()`.
+* docs: Information about quantile prediction.
+* perf: Use `fget` in `assert_predictable`.
+* feat: Store oob error in state without requiring storing the model.
+* fix: `$levels()` of `Task` returns in the correct order.
+* chore: Only print up to 10 classes in the `Task` printer.
+* fix: Check if `quantiles` and `quantile_response` are set.
+
+# mlr3 1.1.0
+
+* feat: Add new measure `MeasureRegrRQR` for quantile regression.
+* feat: Add `$predict_newdata_fast()` method to `Learner` to speed up prediction.
+* fix: `configure_learner` is passed on `run_experiment()` for autotest learners.
+
+# mlr3 1.0.1
+
+* fix: The printer of `Learner` failed when the `validate` field was set.
+* fix: Avoid printing empty line for feature less tasks.
+* perf: Use `data.table::setattr()` for less copying.
+
+# mlr3 1.0.0
+
+* BREAKING CHANGE: The mlr3 ecosystem has a base logger now which is named `mlr3`.
+  The `mlr3/core` logger is a child of the `mlr3` logger and is used for logging messages from the `mlr3` package.
+  Some extension packages have their own loggers which are children of the mlr3 logger e.g. mlr3/mlr3pipelines and mlr3/bbotk for tuning.
+* BREAKING CHANGE: `weights` property and functionality is split into `weights_learner` and `weights_measure`:
+
+  * `weights_learner`: Weights used during training by the Learner.
+  * `weights_measure`: Weights used during scoring predictions via measures.
+
+  Each of these can be disabled via the new field `use_weights` in `Learner` and `Measure` objects.
+* feat: Add `$confusion_weighted` field to `PredictionClassif`.
+* feat: Add `$weights` field to `Prediction`. It contains the `weights_measure` weights from the `Task` that was used for prediction.
+* feat: Add `"macro_weighted"` option to `Measure$average` field.
+* feat: `MeasureRegrRSQ` and `MeasureClassifCost` gain `"weights"` property.
+* feat: `LearnerClassifFeatureless`, `LearnerRegrFeatureless`, `LearnerClassifDebug`, `LearnerRegrDebug` gain `"weights"` property.
+* feat: `Learner` printer now prints information about encapsulation and weights use.
+* feat: Add `score_roc_measures()` to score a prediction on various roc measures.
+* feat: A better error message is thrown, which often happens when incorrectly configuring the `validate` field
+  of a `GraphLearner`
+* feat: Added method `$set_threshold()` to `BenchmarkResult` and `ResamplingResult`, which allows to set the threshold for the response prediction of classification learners, given they have output a probability prediction (#1270).
+* feat: Added field `$uhash_table` to `BenchmarkResult` and functions `uhash()` and `uhashes()`
+  to easily compute uhashes for given learner, task, or resampling ids (#1270).
+* feat: You can now change the default predict type of classification learners to `"prob"` by setting
+  the option `mlr3.prob_as_default` to `TRUE` (#1273).
+* feat: `benchmark_grid()` will now throw a warning if you mix different predict types in the
+  design (#1273).
+* feat: Converting a `BenchmarkResult` to a `data.table` now includes the `task_id`, `learner_id`, and `resampling_id` columns (#1275).
+* fix: Add missing parameters for `"regr.pinball"` and `"sim.phi"` measures.
+* feat: Add new measure `"regr.rqr"` for quantile regression.
+
+# mlr3 0.23.0
+
+* feat: Add new `col_role` offset in `Task` and offset `Learner` property.
+  A warning is produced if a learner that doesn't support offsets is trained with a task that has an offset column.
+* fix: The `$predict_newdata()` method of `Learner` now automatically conducts type conversions (#685).
+* BREAKING_CHANGE: Predicting on a `Task` with the wrong column information is now an error and not a warning.
+* Column names with UTF-8 characters are now allowed by default.
+  The option `mlr3.allow_utf8_names` is removed.
+* BREAKING CHANGE: `Learner$predict_types` is read-only now.
+* docs: Clear up behavior of `Learner$predict_type` after training.
+* feat: Add callbacks to `resample()` and `benchmark()`.
+* fix: Internal tuning and validation now works when the model requires marshaling (#1256)
+
+# mlr3 0.22.1
+
+* fix: Extend `assert_measure()` with checks for trained models in `assert_scorable()`.
+
+# mlr3 0.22.0
+
+* fix: Quantiles must not ascend with probabilities.
+* refactor: Replace `tsk("boston_housing")` with `tsk("california_housing")`.
+* feat: Require unique learner ids in `benchmark_grid()`.
+* BREAKING CHANGE: Remove ``$loglik()`` method from all learners.
+* fix: Ignore `future.globals.maxSize` when `future::plan("sequential")` is used.
+* feat: Add `$characteristics` field to `Task` to store additional information.
+
+# mlr3 0.21.1
+
+* feat: Throw warning when prediction and measure type do not match.
+* fix: The `mlr_reflections` were broken when an extension package was not loaded on the workers.
+  Extension packages must now register themselves in the `mlr_reflections$loaded_packages` field.
+
+# mlr3 0.21.0
+
+* BREAKING CHANGE: Deprecated `data_format` and `data_formats` for `Learner`, `Task`, and `DataBackend` classes.
+* feat: The `partition()` function creates training, test and validation sets now.
+* perf: Optimize the runtime of fixing factor levels.
+* perf: Optimize the runtime of setting row roles.
+* perf: Optimize the runtime of marshalling.
+* perf: Optimize the runtime of `Task$col_info`.
+* fix: column info is now checked for compatibility during `Learner$predict` (#943).
+* BREAKING CHANGE: The predict time of the learner now stores the cumulative duration for all predict sets (#992).
+* feat: `$internal_valid_task` can now be set to an `integer` vector.
+* feat: Measures can now have an empty `$predict_sets` (#1094).
+  This is relevant for measures that only extract information from the model of a learner (such as internal validation scores or AIC / BIC)
+* BREAKING CHANGE: Deprecated the `$divide()` method
+* fix: `Task$cbind()` now works with non-standard primary keys for `data.frames` (#961).
+* fix: Triggering of fallback learner now has log-level `"info"` instead of `"debug"` (#972).
+* feat: Added new measure `regr.pinball` here and in mlr3measures.
+* feat: Added new measure `mu_auc` here and in mlr3measures.
+* feat: Add option to calculate the mean of the true values on the train set in `msr("regr.rsq")`.
+* feat: Default fallback learner is set when encapsulation is activated.
+* feat: Learners `classif.debug` and `regr.debug` have new methods `$importance()` and `$selected_features()` for testing, also in downstream packages.
+* feat: Create default fallback learner with `default_fallback()`.
+* feat: Check column roles when using `$set_col_roles()` and `$col_roles`.
+* fix: Add predict set to learner hash.
+* BREAKING CHANGE: Encapsulation and the fallback learner are now set with the `$encapsulate(method, fallback)` method.
+  The `$fallback` field is read-only now and the encapsulate status can be retrieved from the `$encapsulation` field.
+
+# mlr3 0.20.2
+
+* refactor: Move RhpcBLASctl to suggest.
+* feat: Added resampling property `"primary_iters"`
+* feat: Added possibility to access observation-wise losses via function `$obs_loss`.
+  This is possible for `Prediction`,  `ResampleResult` and `BenchmarkResult`.
+* feat: `Measure`s now also return a vector of numerics.
+
+# mlr3 0.20.1
+* feat: Add multiclass Matthews correlation coefficient `msr("classif.mcc")`.
+
+# mlr3 0.20.0
+
+* Added support for learner-internal validation and tuning.
+
 # mlr3 0.19.0
 
 * Added support for `"marshal"` property, which allows learners to process models so they can be serialized.
@@ -27,7 +297,7 @@ This happens automatically during `resample()` and `benchmark()`.
 # mlr3 0.17.0
 
 * Learners cannot be added to the `HotstartStack` anymore when the model is missing.
-* Learners bellow the `hotstart_threshold` are not added to the `HotstartStack` anymore.
+* Learners below the `hotstart_threshold` are not added to the `HotstartStack` anymore.
 * The `learner$state$train_time` in hotstarted learners is now only the time of the last training.
 * Added debug messages to the hotstart stack.
 * Fixed bug where the `HotstartStack` did not work with column roles set in the task.
@@ -96,10 +366,10 @@ This happens automatically during `resample()` and `benchmark()`.
 
 * Most objects now have a new (optional) field `label`, i.e. `Task`,
   `TaskGenerator`, `Learner`, `Resampling`, and `Measure`.
-* `as.data.table()` methods for objects of class `Dictonary` have been extended
+* `as.data.table()` methods for objects of class `Dictionary` have been extended
   with additional columns.
 * `as_task_classif.formula()` and `as_task_regr.formula()` now remove additional
-  atrributes attached to the data which caused some some learners to break.
+  attributes attached to the data which caused some learners to break.
 * Packages are now loaded prior to calling the `$train()` and `$predict()`
   methods of a `Learner`. This ensures that package loading errors are properly
   propagated and not affected by encapsulation (#771).

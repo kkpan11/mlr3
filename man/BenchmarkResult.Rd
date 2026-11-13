@@ -5,8 +5,12 @@
 \title{Container for Benchmarking Results}
 \description{
 This is the result container object returned by \code{\link[=benchmark]{benchmark()}}.
-A \link{BenchmarkResult} consists of the data of multiple
-\link{ResampleResult}s.
+A \link{BenchmarkResult} consists of the data of multiple \link{ResampleResult}s.
+The contents of a \code{BenchmarkResult} and \link{ResampleResult} are almost identical
+and the stored \link{ResampleResult}s can be extracted via the \verb{$resample_result(i)} method,
+where i is the index of the performed resample experiment.
+This allows us to investigate the extracted \link{ResampleResult}
+and individual resampling iterations, as well as the predictions and models from each fold.
 
 \link{BenchmarkResult}s can be visualized via \CRANpkg{mlr3viz}'s \code{autoplot()} function.
 
@@ -19,7 +23,7 @@ Do not modify any extracted object without cloning it first.
 \section{S3 Methods}{
 
 \itemize{
-\item \code{as.data.table(rr, ..., reassemble_learners = TRUE, convert_predictions = TRUE, predict_sets = "test")}\cr
+\item \code{as.data.table(rr, ..., reassemble_learners = TRUE, convert_predictions = TRUE, predict_sets = "test", task_characteristics = FALSE)}\cr
 \link{BenchmarkResult} -> \code{\link[data.table:data.table]{data.table::data.table()}}\cr
 Returns a tabular view of the internal data.
 \item \code{c(...)}\cr
@@ -67,6 +71,85 @@ rr$predictions()[[1]]$confusion
 # reduce to subset with task id "sonar"
 bmr$filter(task_ids = "sonar")
 print(bmr)
+
+## ------------------------------------------------
+## Method `BenchmarkResult$marshal()`
+## ------------------------------------------------
+
+bmr$marshal()
+
+## ------------------------------------------------
+## Method `BenchmarkResult$unmarshal()`
+## ------------------------------------------------
+
+bmr$unmarshal()
+
+## ------------------------------------------------
+## Method `BenchmarkResult$score()`
+## ------------------------------------------------
+
+bmr$score(msr("classif.acc"))
+
+## ------------------------------------------------
+## Method `BenchmarkResult$obs_loss()`
+## ------------------------------------------------
+
+bmr$obs_loss(msr("classif.acc"))
+
+## ------------------------------------------------
+## Method `BenchmarkResult$aggregate()`
+## ------------------------------------------------
+
+bmr$aggregate()
+
+## ------------------------------------------------
+## Method `BenchmarkResult$filter()`
+## ------------------------------------------------
+
+design = benchmark_grid(
+  tsks(c("iris", "sonar")),
+  lrns(c("classif.debug", "classif.featureless")),
+  rsmp("holdout")
+)
+bmr = benchmark(design)
+bmr
+bmr2 = bmr$clone(deep = TRUE)
+bmr2$filter(learner_ids = "classif.featureless")
+bmr2
+
+## ------------------------------------------------
+## Method `BenchmarkResult$resample_result()`
+## ------------------------------------------------
+
+design = benchmark_grid(
+  tsk("iris"),
+  lrns(c("classif.debug", "classif.featureless")),
+  rsmp("holdout")
+)
+bmr = benchmark(design)
+bmr$resample_result(learner_id = "classif.featureless")
+bmr$resample_result(i = 1)
+bmr$resample_result(uhash = uhashes(bmr, learner_id = "classif.debug"))
+
+## ------------------------------------------------
+## Method `BenchmarkResult$discard()`
+## ------------------------------------------------
+
+bmr$discard(models = TRUE)
+
+## ------------------------------------------------
+## Method `BenchmarkResult$set_threshold()`
+## ------------------------------------------------
+
+design = benchmark_grid(
+  tsk("sonar"),
+  lrns(c("classif.debug", "classif.featureless"), predict_type = "prob"),
+  rsmp("holdout")
+)
+bmr = benchmark(design)
+bmr$set_threshold(0.8, learner_ids = "classif.featureless")
+bmr$set_threshold(0.3, i = 2)
+bmr$set_threshold(0.7, uhashes = uhashes(bmr, learner_ids = "classif.featureless"))
 }
 \seealso{
 \itemize{
@@ -76,21 +159,21 @@ print(bmr)
 \item \CRANpkg{mlr3benchmark} for post-hoc analysis of benchmark results.
 }
 
-Other benchmark: 
-\code{\link{benchmark}()},
-\code{\link{benchmark_grid}()}
+Other benchmark:
+\code{\link[=benchmark]{benchmark()}},
+\code{\link[=benchmark_grid]{benchmark_grid()}}
 }
 \concept{benchmark}
 \section{Active bindings}{
-\if{html}{\out{<div class="r6-active-bindings">}}
-\describe{
-\item{\code{task_type}}{(\code{character(1)})\cr
+  \if{html}{\out{<div class="r6-active-bindings">}}
+  \describe{
+    \item{\code{task_type}}{(\code{character(1)})\cr
 Task type of objects in the \code{BenchmarkResult}.
 All stored objects (\link{Task}, \link{Learner}, \link{Prediction}) in a single \code{BenchmarkResult} are
 required to have the same task type, e.g., \code{"classif"} or \code{"regr"}.
 This is \code{NA} for empty \link{BenchmarkResult}s.}
 
-\item{\code{tasks}}{(\code{\link[data.table:data.table]{data.table::data.table()}})\cr
+    \item{\code{tasks}}{(\code{\link[data.table:data.table]{data.table::data.table()}})\cr
 Table of included \link{Task}s with three columns:
 \itemize{
 \item \code{"task_hash"} (\code{character(1)}),
@@ -98,7 +181,7 @@ Table of included \link{Task}s with three columns:
 \item \code{"task"} (\link{Task}).
 }}
 
-\item{\code{learners}}{(\code{\link[data.table:data.table]{data.table::data.table()}})\cr
+    \item{\code{learners}}{(\code{\link[data.table:data.table]{data.table::data.table()}})\cr
 Table of included \link{Learner}s with three columns:
 \itemize{
 \item \code{"learner_hash"} (\code{character(1)}),
@@ -107,10 +190,10 @@ Table of included \link{Learner}s with three columns:
 }
 
 Note that it is not feasible to access learned models via this field, as the training task would be ambiguous.
-For this reason the returned learner are reset before they are returned.
+For this reason the returned learners are reset before they are returned.
 Instead, select a row from the table returned by \verb{$score()}.}
 
-\item{\code{resamplings}}{(\code{\link[data.table:data.table]{data.table::data.table()}})\cr
+    \item{\code{resamplings}}{(\code{\link[data.table:data.table]{data.table::data.table()}})\cr
 Table of included \link{Resampling}s with three columns:
 \itemize{
 \item \code{"resampling_hash"} (\code{character(1)}),
@@ -118,161 +201,192 @@ Table of included \link{Resampling}s with three columns:
 \item \code{"resampling"} (\link{Resampling}).
 }}
 
-\item{\code{resample_results}}{(\code{\link[data.table:data.table]{data.table::data.table()}})\cr
+    \item{\code{resample_results}}{(\code{\link[data.table:data.table]{data.table::data.table()}})\cr
 Returns a table with three columns:
 \itemize{
 \item \code{uhash} (\code{character()}).
 \item \code{resample_result} (\link{ResampleResult}).
 }}
 
-\item{\code{n_resample_results}}{(\code{integer(1)})\cr
+    \item{\code{n_resample_results}}{(\code{integer(1)})\cr
 Returns the total number of stored \link{ResampleResult}s.}
 
-\item{\code{uhashes}}{(\code{character()})\cr
+    \item{\code{uhashes}}{(\code{character()})\cr
 Set of (unique) hashes of all included \link{ResampleResult}s.}
-}
-\if{html}{\out{</div>}}
+
+    \item{\code{uhash_table}}{(\link[data.table:data.table]{data.table::data.table})\cr
+Table with columns \code{uhash}, \code{learner_id}, \code{task_id} and \code{resampling_id}.}
+  }
+  \if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
-\itemize{
-\item \href{#method-BenchmarkResult-new}{\code{BenchmarkResult$new()}}
-\item \href{#method-BenchmarkResult-help}{\code{BenchmarkResult$help()}}
-\item \href{#method-BenchmarkResult-format}{\code{BenchmarkResult$format()}}
-\item \href{#method-BenchmarkResult-print}{\code{BenchmarkResult$print()}}
-\item \href{#method-BenchmarkResult-combine}{\code{BenchmarkResult$combine()}}
-\item \href{#method-BenchmarkResult-marshal}{\code{BenchmarkResult$marshal()}}
-\item \href{#method-BenchmarkResult-unmarshal}{\code{BenchmarkResult$unmarshal()}}
-\item \href{#method-BenchmarkResult-score}{\code{BenchmarkResult$score()}}
-\item \href{#method-BenchmarkResult-aggregate}{\code{BenchmarkResult$aggregate()}}
-\item \href{#method-BenchmarkResult-filter}{\code{BenchmarkResult$filter()}}
-\item \href{#method-BenchmarkResult-resample_result}{\code{BenchmarkResult$resample_result()}}
-\item \href{#method-BenchmarkResult-discard}{\code{BenchmarkResult$discard()}}
-\item \href{#method-BenchmarkResult-clone}{\code{BenchmarkResult$clone()}}
-}
+  \itemize{
+    \item \href{#method-BenchmarkResult-initialize}{\code{BenchmarkResult$new()}}
+    \item \href{#method-BenchmarkResult-help}{\code{BenchmarkResult$help()}}
+    \item \href{#method-BenchmarkResult-format}{\code{BenchmarkResult$format()}}
+    \item \href{#method-BenchmarkResult-print}{\code{BenchmarkResult$print()}}
+    \item \href{#method-BenchmarkResult-combine}{\code{BenchmarkResult$combine()}}
+    \item \href{#method-BenchmarkResult-marshal}{\code{BenchmarkResult$marshal()}}
+    \item \href{#method-BenchmarkResult-unmarshal}{\code{BenchmarkResult$unmarshal()}}
+    \item \href{#method-BenchmarkResult-score}{\code{BenchmarkResult$score()}}
+    \item \href{#method-BenchmarkResult-obs_loss}{\code{BenchmarkResult$obs_loss()}}
+    \item \href{#method-BenchmarkResult-aggregate}{\code{BenchmarkResult$aggregate()}}
+    \item \href{#method-BenchmarkResult-filter}{\code{BenchmarkResult$filter()}}
+    \item \href{#method-BenchmarkResult-resample_result}{\code{BenchmarkResult$resample_result()}}
+    \item \href{#method-BenchmarkResult-discard}{\code{BenchmarkResult$discard()}}
+    \item \href{#method-BenchmarkResult-set_threshold}{\code{BenchmarkResult$set_threshold()}}
+    \item \href{#method-BenchmarkResult-clone}{\code{BenchmarkResult$clone()}}
+  }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-BenchmarkResult-new"></a>}}
-\if{latex}{\out{\hypertarget{method-BenchmarkResult-new}{}}}
-\subsection{Method \code{new()}}{
-Creates a new instance of this \link[R6:R6Class]{R6} class.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$new(data = NULL)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{data}}{(\code{ResultData})\cr
+\if{html}{\out{<a id="method-BenchmarkResult-initialize"></a>}}
+\if{latex}{\out{\hypertarget{method-BenchmarkResult-initialize}{}}}
+\subsection{\code{BenchmarkResult$new()}}{
+  Creates a new instance of this \link[R6:R6Class]{R6} class.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$new(data = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{data}}{(\code{ResultData})\cr
 An object of type \code{ResultData}, either extracted from another \link{ResampleResult}, another
 \link{BenchmarkResult}, or manually constructed with \code{\link[=as_result_data]{as_result_data()}}.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
-\if{html}{\out{</div>}}
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-help"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-help}{}}}
-\subsection{Method \code{help()}}{
-Opens the help page for this object.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$help()}\if{html}{\out{</div>}}
+\subsection{\code{BenchmarkResult$help()}}{
+  Opens the help page for this object.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$help()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-format"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-format}{}}}
-\subsection{Method \code{format()}}{
-Helper for print outputs.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$format(...)}\if{html}{\out{</div>}}
+\subsection{\code{BenchmarkResult$format()}}{
+  Helper for print outputs.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$format(...)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{...}}{(ignored).}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{...}}{(ignored).}
-}
-\if{html}{\out{</div>}}
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-print"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-print}{}}}
-\subsection{Method \code{print()}}{
-Printer.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$print()}\if{html}{\out{</div>}}
+\subsection{\code{BenchmarkResult$print()}}{
+  Printer.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$print()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-combine"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-combine}{}}}
-\subsection{Method \code{combine()}}{
-Fuses a second \link{BenchmarkResult} into itself, mutating the \link{BenchmarkResult} in-place.
+\subsection{\code{BenchmarkResult$combine()}}{
+  Fuses a second \link{BenchmarkResult} into itself, mutating the \link{BenchmarkResult} in-place.
 If the second \link{BenchmarkResult} \code{bmr} is \code{NULL}, simply returns \code{self}.
 Note that you can alternatively use the combine function \code{\link[=c]{c()}} which calls this method internally.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$combine(bmr)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{bmr}}{(\link{BenchmarkResult})\cr
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$combine(bmr)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{bmr}}{(\link{BenchmarkResult})\cr
 A second \link{BenchmarkResult} object.}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Returns the object itself, but modified \strong{by reference}.
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Returns the object itself, but modified \strong{by reference}.
 You need to explicitly \verb{$clone()} the object beforehand if you want to keep
 the object in its previous state.
+  }
 }
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-marshal"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-marshal}{}}}
-\subsection{Method \code{marshal()}}{
-Marshals all stored models.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$marshal(...)}\if{html}{\out{</div>}}
+\subsection{\code{BenchmarkResult$marshal()}}{
+  Marshals all stored models.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$marshal(...)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{...}}{(any)\cr
+Additional arguments passed to \code{\link[=marshal_model]{marshal_model()}}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Examples}{
+    \if{html}{\out{<div class="r example copy">}}
+    \preformatted{bmr$marshal()
+}
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{...}}{(any)\cr
-Additional arguments passed to \code{\link[=marshal_model]{marshal_model()}}.}
-}
-\if{html}{\out{</div>}}
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-unmarshal"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-unmarshal}{}}}
-\subsection{Method \code{unmarshal()}}{
-Unmarshals all stored models.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$unmarshal(...)}\if{html}{\out{</div>}}
+\subsection{\code{BenchmarkResult$unmarshal()}}{
+  Unmarshals all stored models.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$unmarshal(...)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{...}}{(any)\cr
+Additional arguments passed to \code{\link[=unmarshal_model]{unmarshal_model()}}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Examples}{
+    \if{html}{\out{<div class="r example copy">}}
+    \preformatted{bmr$unmarshal()
+}
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{...}}{(any)\cr
-Additional arguments passed to \code{\link[=unmarshal_model]{unmarshal_model()}}.}
-}
-\if{html}{\out{</div>}}
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-score"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-score}{}}}
-\subsection{Method \code{score()}}{
-Returns a table with one row for each resampling iteration, including
+\subsection{\code{BenchmarkResult$score()}}{
+  Returns a table with one row for each resampling iteration, including
 all involved objects: \link{Task}, \link{Learner}, \link{Resampling}, iteration number
 (\code{integer(1)}), and \link{Prediction}. If \code{ids} is set to \code{TRUE}, character
 column of extracted ids are added to the table for convenient
@@ -281,47 +395,84 @@ filtering: \code{"task_id"}, \code{"learner_id"}, and \code{"resampling_id"}.
 Additionally calculates the provided performance measures and binds the
 performance scores as extra columns. These columns are named using the id of
 the respective \link{Measure}.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$score(
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$score(
   measures = NULL,
   ids = TRUE,
   conditions = FALSE,
-  predict_sets = "test"
-)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{measures}}{(\link{Measure} | list of \link{Measure})\cr
+  predictions = TRUE
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{measures}}{(\link{Measure} | list of \link{Measure} | \code{NULL})\cr
 Measure(s) to calculate.}
-
-\item{\code{ids}}{(\code{logical(1)})\cr
+      \item{\code{ids}}{(\code{logical(1)})\cr
 Adds object ids (\code{"task_id"}, \code{"learner_id"}, \code{"resampling_id"}) as
 extra character columns to the returned table.}
-
-\item{\code{conditions}}{(\code{logical(1)})\cr
+      \item{\code{conditions}}{(\code{logical(1)})\cr
 Adds condition messages (\code{"warnings"}, \code{"errors"}) as extra
 list columns of character vectors to the returned table}
+      \item{\code{predictions}}{(\code{logical(1)})\cr
+Additionally return prediction objects, one column for each \code{predict_set} of all learners combined.
+Columns are named \code{"prediction_train"}, \code{"prediction_test"} and \code{"prediction_internal_valid"},
+if present.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    \code{\link[data.table:data.table]{data.table::data.table()}}.
+  }
+  \subsection{Examples}{
+    \if{html}{\out{<div class="r example copy">}}
+    \preformatted{bmr$score(msr("classif.acc"))
+}
+    \if{html}{\out{</div>}}
+  }
+}
 
-\item{\code{predict_sets}}{(\code{character()})\cr
-Prediction sets to operate on, used in \code{aggregate()} to extract the matching \code{predict_sets} from the \link{ResampleResult}.
-Multiple predict sets are calculated by the respective \link{Learner} during \code{\link[=resample]{resample()}}/\code{\link[=benchmark]{benchmark()}}.
-Must be a non-empty subset of \verb{\{"train", "test", "holdout"\}}.
-If multiple sets are provided, these are first combined to a single prediction object.
-Default is \code{"test"}.}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-BenchmarkResult-obs_loss"></a>}}
+\if{latex}{\out{\hypertarget{method-BenchmarkResult-obs_loss}{}}}
+\subsection{\code{BenchmarkResult$obs_loss()}}{
+  Calculates the observation-wise loss via the \link{Measure}'s \code{obs_loss} method.
+Returns a \code{data.table()} with columns from the predictions (e.g., \code{row_ids}, \code{truth}, \code{response}, etc.),
+plus one numeric column for each measure, named with the respective measure id, and a \code{resample_result} column.
+If there is no observation-wise loss function for the measure, the column is filled with \code{NA_real_} values.
+Note that some measures such as RMSE, do have an \verb{$obs_loss},
+but they require an additional transformation after aggregation,
+in this example taking the square-root.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$obs_loss(measures = NULL, predict_sets = "test")}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{measures}}{(\link{Measure} | list of \link{Measure} | \code{NULL})\cr
+Measure(s) to calculate.}
+      \item{\code{predict_sets}}{(\code{character()})\cr
+The predict sets.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Examples}{
+    \if{html}{\out{<div class="r example copy">}}
+    \preformatted{bmr$obs_loss(msr("classif.acc"))
 }
-\if{html}{\out{</div>}}
+    \if{html}{\out{</div>}}
+  }
 }
-\subsection{Returns}{
-\code{\link[data.table:data.table]{data.table::data.table()}}.
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-aggregate"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-aggregate}{}}}
-\subsection{Method \code{aggregate()}}{
-Returns a result table where resampling iterations are combined into
+\subsection{\code{BenchmarkResult$aggregate()}}{
+  Returns a result table where resampling iterations are combined into
 \link{ResampleResult}s. A column with the aggregated performance score is
 added for each \link{Measure}, named with the id of the respective measure.
 
@@ -339,160 +490,279 @@ significance tests.
 
 For convenience, different flags can be set to extract more
 information from the returned \link{ResampleResult}.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$aggregate(
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$aggregate(
   measures = NULL,
   ids = TRUE,
   uhashes = FALSE,
   params = FALSE,
   conditions = FALSE
-)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{measures}}{(\link{Measure} | list of \link{Measure})\cr
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{measures}}{(\link{Measure} | list of \link{Measure} | \code{NULL})\cr
 Measure(s) to calculate.}
-
-\item{\code{ids}}{(\code{logical(1)})\cr
+      \item{\code{ids}}{(\code{logical(1)})\cr
 Adds object ids (\code{"task_id"}, \code{"learner_id"}, \code{"resampling_id"}) as
 extra character columns for convenient subsetting.}
-
-\item{\code{uhashes}}{(\code{logical(1)})\cr
+      \item{\code{uhashes}}{(\code{logical(1)})\cr
 Adds the uhash values of the \link{ResampleResult} as extra character
 column \code{"uhash"}.}
-
-\item{\code{params}}{(\code{logical(1)})\cr
+      \item{\code{params}}{(\code{logical(1)})\cr
 Adds the hyperparameter values as extra list column \code{"params"}. You
 can unnest them with \code{\link[mlr3misc:unnest]{mlr3misc::unnest()}}.}
-
-\item{\code{conditions}}{(\code{logical(1)})\cr
+      \item{\code{conditions}}{(\code{logical(1)})\cr
 Adds the number of resampling iterations with at least one warning as
 extra integer column \code{"warnings"}, and the number of resampling
 iterations with errors as extra integer column \code{"errors"}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    \code{\link[data.table:data.table]{data.table::data.table()}}.
+  }
+  \subsection{Examples}{
+    \if{html}{\out{<div class="r example copy">}}
+    \preformatted{bmr$aggregate()
 }
-\if{html}{\out{</div>}}
+    \if{html}{\out{</div>}}
+  }
 }
-\subsection{Returns}{
-\code{\link[data.table:data.table]{data.table::data.table()}}.
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-filter"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-filter}{}}}
-\subsection{Method \code{filter()}}{
-Subsets the benchmark result. If \code{task_ids} is not \code{NULL}, keeps all
-tasks with provided task ids and discards all others tasks.
-Same procedure for \code{learner_ids} and \code{resampling_ids}.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$filter(
-  task_ids = NULL,
-  task_hashes = NULL,
+\subsection{\code{BenchmarkResult$filter()}}{
+  Subsets the benchmark result.
+You can either directly provide the row IDs or the uhashes of the resample results to keep,
+or use the \code{learner_ids}, \code{task_ids} and \code{resampling_ids} arguments to filter for learner,
+task and resampling IDs.
+The three options are mutually exclusive.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$filter(
+  i = NULL,
+  uhashes = NULL,
   learner_ids = NULL,
-  learner_hashes = NULL,
-  resampling_ids = NULL,
-  resampling_hashes = NULL
-)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{task_ids}}{(\code{character()})\cr
-Ids of \link{Task}s to keep.}
-
-\item{\code{task_hashes}}{(\code{character()})\cr
-Hashes of \link{Task}s to keep.}
-
-\item{\code{learner_ids}}{(\code{character()})\cr
-Ids of \link{Learner}s to keep.}
-
-\item{\code{learner_hashes}}{(\code{character()})\cr
-Hashes of \link{Learner}s to keep.}
-
-\item{\code{resampling_ids}}{(\code{character()})\cr
-Ids of \link{Resampling}s to keep.}
-
-\item{\code{resampling_hashes}}{(\code{character()})\cr
-Hashes of \link{Resampling}s to keep.}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Returns the object itself, but modified \strong{by reference}.
-You need to explicitly \verb{$clone()} the object beforehand if you want to keeps
+  task_ids = NULL,
+  resampling_ids = NULL
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{i}}{(\code{integer()} | \code{NULL})\cr
+The iteration values to filter for.}
+      \item{\code{uhashes}}{(\code{character()} | \code{NULL})\cr
+The uhashes of the resample results to filter for.}
+      \item{\code{learner_ids}}{(\code{character()} | \code{NULL})\cr
+The learner IDs to filter for.}
+      \item{\code{task_ids}}{(\code{character()} | \code{NULL})\cr
+The task IDs to filter for.}
+      \item{\code{resampling_ids}}{(\code{character()} | \code{NULL})\cr
+The resampling IDs to filter for.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Returns the object itself, but modified \strong{by reference}.
+You need to explicitly \verb{$clone()} the object beforehand if you want to keep
 the object in its previous state.
+  }
+  \subsection{Examples}{
+    \if{html}{\out{<div class="r example copy">}}
+    \preformatted{design = benchmark_grid(
+  tsks(c("iris", "sonar")),
+  lrns(c("classif.debug", "classif.featureless")),
+  rsmp("holdout")
+)
+bmr = benchmark(design)
+bmr
+bmr2 = bmr$clone(deep = TRUE)
+bmr2$filter(learner_ids = "classif.featureless")
+bmr2
 }
+    \if{html}{\out{</div>}}
+  }
 }
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-resample_result"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-resample_result}{}}}
-\subsection{Method \code{resample_result()}}{
-Retrieve the i-th \link{ResampleResult}, by position or by unique hash \code{uhash}.
-\code{i} and \code{uhash} are mutually exclusive.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$resample_result(i = NULL, uhash = NULL)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{i}}{(\code{integer(1)})\cr
+\subsection{\code{BenchmarkResult$resample_result()}}{
+  Retrieve the i-th \link{ResampleResult}, by position, by unique hash \code{uhash} or by learner,
+task and resampling IDs.
+All three options are mutually exclusive.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$resample_result(
+  i = NULL,
+  uhash = NULL,
+  task_id = NULL,
+  learner_id = NULL,
+  resampling_id = NULL
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{i}}{(\code{integer(1)} | \code{NULL})\cr
 The iteration value to filter for.}
+      \item{\code{uhash}}{(\code{character(1)} | \code{NULL})\cr
+The unique identifier to filter for.}
+      \item{\code{task_id}}{(\code{character(1)} | \code{NULL})\cr
+The task ID to filter for.}
+      \item{\code{learner_id}}{(\code{character(1)} | \code{NULL})\cr
+The learner ID to filter for.}
+      \item{\code{resampling_id}}{(\code{character(1)} | \code{NULL})\cr
+The resampling ID to filter for.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    \link{ResampleResult}.
+  }
+  \subsection{Examples}{
+    \if{html}{\out{<div class="r example copy">}}
+    \preformatted{design = benchmark_grid(
+  tsk("iris"),
+  lrns(c("classif.debug", "classif.featureless")),
+  rsmp("holdout")
+)
+bmr = benchmark(design)
+bmr$resample_result(learner_id = "classif.featureless")
+bmr$resample_result(i = 1)
+bmr$resample_result(uhash = uhashes(bmr, learner_id = "classif.debug"))
+}
+    \if{html}{\out{</div>}}
+  }
+}
 
-\item{\code{uhash}}{(\code{logical(1)})\cr
-The \code{ushash} value to filter for.}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-\link{ResampleResult}.
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-discard"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-discard}{}}}
-\subsection{Method \code{discard()}}{
-Shrinks the \link{BenchmarkResult} by discarding parts of the internally stored data.
+\subsection{\code{BenchmarkResult$discard()}}{
+  Shrinks the \link{BenchmarkResult} by discarding parts of the internally stored data.
 Note that certain operations might stop work, e.g. extracting
 importance values from learners or calculating measures requiring the task's data.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$discard(backends = FALSE, models = FALSE)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{backends}}{(\code{logical(1)})\cr
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$discard(backends = FALSE, models = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{backends}}{(\code{logical(1)})\cr
 If \code{TRUE}, the \link{DataBackend} is removed from all stored \link{Task}s.}
-
-\item{\code{models}}{(\code{logical(1)})\cr
+      \item{\code{models}}{(\code{logical(1)})\cr
 If \code{TRUE}, the stored model is removed from all \link{Learner}s.}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Returns the object itself, but modified \strong{by reference}.
-You need to explicitly \verb{$clone()} the object beforehand if you want to keeps
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Returns the object itself, but modified \strong{by reference}.
+You need to explicitly \verb{$clone()} the object beforehand if you want to keep
 the object in its previous state.
+  }
+  \subsection{Examples}{
+    \if{html}{\out{<div class="r example copy">}}
+    \preformatted{bmr$discard(models = TRUE)
 }
+    \if{html}{\out{</div>}}
+  }
 }
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-BenchmarkResult-set_threshold"></a>}}
+\if{latex}{\out{\hypertarget{method-BenchmarkResult-set_threshold}{}}}
+\subsection{\code{BenchmarkResult$set_threshold()}}{
+  Sets the threshold for the response prediction of classification learners, given they have
+output a probability prediction for a binary classification task.
+
+The resample results for which to change the threshold can either be specified directly
+via \code{uhashes}, by selecting the specific iterations (\code{i}) or by filtering according to
+learner, task and resampling IDs.
+
+If none of the three options is specified, the threshold is set for all resample results.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$set_threshold(
+  threshold,
+  i = NULL,
+  uhashes = NULL,
+  learner_ids = NULL,
+  task_ids = NULL,
+  resampling_ids = NULL,
+  ties_method = "random"
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{threshold}}{(\code{numeric(1)})\cr
+Threshold value.}
+      \item{\code{i}}{(\code{integer()} | \code{NULL})\cr
+The iteration values to filter for.}
+      \item{\code{uhashes}}{(\code{character()} | \code{NULL})\cr
+The unique identifiers of the \link{ResampleResult}s for which the threshold should be set.}
+      \item{\code{learner_ids}}{(\code{character()} | \code{NULL})\cr
+The learner IDs for which the threshold should be set.}
+      \item{\code{task_ids}}{(\code{character()} | \code{NULL})\cr
+The task IDs for which the threshold should be set.}
+      \item{\code{resampling_ids}}{(\code{character()} | \code{NULL})\cr
+The resampling IDs for which the threshold should be set.}
+      \item{\code{ties_method}}{(\code{character(1)})\cr
+Method to handle ties in probabilities when selecting a class label.
+Must be one of \code{"random"}, \code{"first"} or \code{"last"} (corresponding to the same options in \code{\link[=max.col]{max.col()}}).
+\itemize{
+\item \code{"random"}: Randomly select one of the tied class labels (default).
+\item \code{"first"}: Select the first class label among tied values.
+\item \code{"last"}: Select the last class label among tied values.
+}}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Examples}{
+    \if{html}{\out{<div class="r example copy">}}
+    \preformatted{design = benchmark_grid(
+  tsk("sonar"),
+  lrns(c("classif.debug", "classif.featureless"), predict_type = "prob"),
+  rsmp("holdout")
+)
+bmr = benchmark(design)
+bmr$set_threshold(0.8, learner_ids = "classif.featureless")
+bmr$set_threshold(0.3, i = 2)
+bmr$set_threshold(0.7, uhashes = uhashes(bmr, learner_ids = "classif.featureless"))
+}
+    \if{html}{\out{</div>}}
+  }
+}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-BenchmarkResult-clone"></a>}}
 \if{latex}{\out{\hypertarget{method-BenchmarkResult-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkResult$clone(deep = FALSE)}\if{html}{\out{</div>}}
+\subsection{\code{BenchmarkResult$clone()}}{
+  The objects of this class are cloneable with this method.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{BenchmarkResult$clone(deep = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{deep}}{Whether to make a deep clone.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
-}
-}
 }

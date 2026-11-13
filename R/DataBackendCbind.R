@@ -1,38 +1,35 @@
 #' @include DataBackend.R
-DataBackendCbind = R6Class("DataBackendCbind", inherit = DataBackend, cloneable = FALSE,
+DataBackendCbind = R6Class(
+  "DataBackendCbind",
+  inherit = DataBackend,
+  cloneable = FALSE,
   public = list(
     initialize = function(b1, b2) {
       assert_backend(b1)
       assert_backend(b2)
       pk = b1$primary_key
 
-      data_formats = intersect(b1$data_formats, b2$data_formats)
-      if ("data.table" %nin% data_formats) {
-        stopf("There is supported data format for the backends to cbind (supported: 'data.table')")
-      }
-
       if (pk != b2$primary_key) {
-        stopf("All backends to cbind must have the primary_key '%s'", pk)
+        error_input("All backends to cbind must have the primary_key '%s'", pk)
       }
 
-      super$initialize(list(b1 = b1, b2 = b2), pk, "data.table")
+      super$initialize(list(b1 = b1, b2 = b2), pk)
     },
 
-    data = function(rows, cols, data_format = "data.table") {
+    data = function(rows, cols) {
       pk = self$primary_key
       qrows = unique(assert_numeric(rows))
       qcols = union(assert_names(cols, type = "unique"), pk)
-      assert_choice(data_format, self$data_formats)
 
-      data = private$.data$b2$data(qrows, qcols, data_format = data_format)
+      data = private$.data$b2$data(qrows, qcols)
       if (ncol(data) < length(qcols)) {
         qcols = c(setdiff(cols, names(data)), pk)
-        tmp = private$.data$b1$data(qrows, qcols, data_format = data_format)
+        tmp = private$.data$b1$data(qrows, qcols)
         data = merge(data, tmp, by = pk, all = TRUE, sort = TRUE)
       }
 
       # duplicate rows / reorder columns
-      ijoin(data, rows,  intersect(cols, names(data)), pk)
+      ijoin(data, rows, intersect(cols, names(data)), pk)
     },
 
     head = function(n = 6L) {

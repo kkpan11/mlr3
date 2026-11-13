@@ -4,8 +4,22 @@ test_that("autotest", {
   result = run_autotest(learner)
   expect_true(result, info = result$error)
 
-  exclude = c("formula", "data", "weights", "subset", "na.action", "method", "model",
-    "x", "y", "parms", "control", "cost", "keep_model")
+  exclude = c(
+    "formula",
+    "data",
+    "weights",
+    "subset",
+    "na.action",
+    "method",
+    "model",
+    "x",
+    "y",
+    "parms",
+    "control",
+    "cost",
+    "keep_model",
+    "use_weights"
+  )
   result = run_paramtest(learner, list(rpart::rpart, rpart::rpart.control), exclude, tag = "train")
   expect_true(result, info = result$error)
 
@@ -36,21 +50,20 @@ test_that("selected_features", {
   expect_subset(sf, task$feature_names, empty.ok = FALSE)
 })
 
-
-test_that("weights", {
-  task = TaskClassif$new("foo", as_data_backend(cbind(iris, data.frame(w = rep(c(1, 10, 100), each = 50)))), target = "Species")
-  task$set_col_roles("w", character())
-  learner = lrn("classif.rpart")
-
+test_that("use_weights actually influences the model", {
+  task = TaskClassif$new(
+    "foo",
+    as_data_backend(cbind(iris, data.frame(w = rep(c(1, 10, 100), each = 50)))),
+    target = "Species"
+  )
+  task$set_col_roles("w", "weights_learner")
+  learner = lrn("classif.rpart", use_weights = "use")
   learner$train(task)
   c1 = learner$predict(task)$confusion
-
-  task$set_col_roles("w", "weight")
+  learner = lrn("classif.rpart", use_weights = "ignore")
   learner$train(task)
   c2 = learner$predict(task)$confusion
-
-  expect_true(sum(c1[1:2, 3]) > 0)
-  expect_true(sum(c2[1:2, 3]) == 0)
+  expect_false(all(c1 == c2))
 })
 
 test_that("default_values on rpart", {
@@ -60,7 +73,7 @@ test_that("default_values on rpart", {
     minbucket = p_int(1, 64, logscale = TRUE),
     cp = p_dbl(1e-04, 1e-1, logscale = TRUE)
   )
-  task = tsk("pima")
+  task = tsk("sonar")
 
   values = default_values(learner, search_space, task)
   expect_names(names(values), permutation.of = c("minsplit", "minbucket", "cp"))

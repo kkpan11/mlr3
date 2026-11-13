@@ -27,7 +27,8 @@
 #'
 #' @template seealso_prediction
 #' @export
-Prediction = R6Class("Prediction",
+Prediction = R6Class(
+  "Prediction",
   public = list(
     #' @field data (named `list()`)\cr
     #' Internal data structure.
@@ -61,10 +62,10 @@ Prediction = R6Class("Prediction",
     print = function(...) {
       n = length(self$data$row_ids)
       if (n == 0L) {
-        catf("%s for 0 observations", format(self))
+        cat_cli(cli_h1("{.cls {class(self)[1L]}} for {.val 0} observations"))
       } else {
         data = as.data.table(self)
-        catf("%s for %i observations:", format(self), n)
+        cat_cli(cli_h1("{.cls {class(self)[1L]}} for {.val {n}} observations:"))
         print(data, nrows = 10L, topn = 3L, class = FALSE, row.names = FALSE, print.keys = FALSE)
       }
     },
@@ -88,11 +89,30 @@ Prediction = R6Class("Prediction",
     #'
     #' @param train_set (`integer()`).
     #'
-    #' @return [Prediction].
+    #' @return Named `numeric()`.
     score = function(measures = NULL, task = NULL, learner = NULL, train_set = NULL) {
-      measures = as_measures(measures, task_type = self$task_type)
-      scores = map_dbl(measures, function(m) m$score(prediction = self, task = task, learner = learner, train_set = train_set))
+      measures = assert_measures(as_measures(measures, task_type = self$task_type))
+      scores = map_dbl(measures, function(m) {
+        m$score(prediction = self, task = task, learner = learner, train_set = train_set)
+      })
       set_names(scores, ids(measures))
+    },
+
+    #' @description
+    #' Calculates the observation-wise loss via the [Measure]'s `obs_loss` method.
+    #' Returns a `data.table()` with the columns of the matching [Prediction] object plus one additional numeric column
+    #' for each measure, named with the respective measure id.
+    #' If there is no observation-wise loss function for the measure, the column is filled with `NA_real_` values.
+    #' Note that some measures such as RMSE, do have an `$obs_loss`,
+    #' but they require an additional transformation after aggregation,
+    #' in this example taking the square-root.
+    #'
+    #' @return [data.table::data.table()].
+    obs_loss = function(measures = NULL) {
+      measures = assert_measures(as_measures(measures, task_type = self$task_type))
+      tab = as.data.table(self)
+      walk(measures, function(m) set(tab, j = m$id, value = m$obs_loss(prediction = self)))
+      tab[]
     },
 
     #' @description
@@ -129,12 +149,46 @@ Prediction = R6Class("Prediction",
     missing = function(rhs) {
       assert_ro_binding(rhs)
       is_missing_prediction_data(self$data)
+    },
+
+    #' @field weights (`numeric()`)\cr
+    #'   Vector of measure weights, obtained from the `weights_measure` column of the [Task] if present.
+    #'   This is `NULL` if no weights are present.
+    weights = function(rhs) {
+      assert_ro_binding(rhs)
+      self$data$weights
+    },
+
+    #' @field extra (named `list()`)\cr
+    #'   Additional per-observation data stored in the prediction object, e.g., quantities returned by the learner
+    #'   that are not covered by a predict type.
+    #'   Each element is a vector with one entry per observation, i.e., of the same length as `row_ids`.
+    #'   Names must be unique and may not clash with the names of the standard prediction columns
+    #'   (e.g., `"row_ids"`, `"truth"`, `"response"`, or `"weights"`).
+    #'   The extra data is subset by `$filter()`, combined row-wise by [c()],
+    #'   and appended as additional columns by [data.table::as.data.table()].
+    #'   This is `NULL` if no extra data is present.
+    extra = function(rhs) {
+      assert_ro_binding(rhs)
+      self$data$extra
+    },
+
+    #' @field raw (any)\cr
+    #'   Raw prediction object from the upstream model.
+    #'   Only available if the learner's `predict_raw` flag was set to `TRUE` and the learner implementation
+    #'   supports it.
+    #'   The object is stored as-is, without validation or subsetting during filtering.
+    #'   When multiple predictions are combined via `c()`, the individual raw objects are collected into a `list()`.
+    raw = function(rhs) {
+      assert_ro_binding(rhs)
+      self$data$raw
     }
   )
 )
 
 #' @export
-c.Prediction = function(..., keep_duplicates = TRUE) { # nolint
+# nolint next
+c.Prediction = function(..., keep_duplicates = TRUE) {
   dots = list(...)
   if (length(dots) == 1L) {
     return(dots[[1L]])
@@ -142,15 +196,10 @@ c.Prediction = function(..., keep_duplicates = TRUE) { # nolint
 
   classes = unique(map_chr(dots, function(x) class(x)[1L]))
   if (length(classes) > 1L) {
-    stopf("Cannot combine objects of different type: %s", str_collapse(classes))
+    error_input("Cannot combine objects of different type: %s", str_collapse(classes))
   }
   assert_flag(keep_duplicates)
 
   pdata = invoke(c, .args = c(map(dots, "data"), list(keep_duplicates = keep_duplicates)))
   as_prediction(pdata, check = FALSE)
 }
-
-# #' @export
-# format_list_item.Prediction = function(x, ...) { # nolint
-#   sprintf("<prd[%i]>", length(x$row_ids))
-# }

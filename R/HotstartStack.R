@@ -28,8 +28,8 @@
 #'
 #' @export
 #' @examples
-#' # train learner on pima task
-#' task = tsk("pima")
+#' # train learner on sonar task
+#' task = tsk("sonar")
 #' learner = lrn("classif.debug", iter = 1)
 #' learner$train(task)
 #'
@@ -47,9 +47,9 @@
 #'
 #' # train automatically uses hot start learner while fitting the model
 #' learner$train(task)
-HotstartStack = R6Class("HotstartStack",
+HotstartStack = R6Class(
+  "HotstartStack",
   public = list(
-
     #' @field stack [data.table::data.table()]\cr
     #' Stores hot start learners.
     stack = NULL,
@@ -86,10 +86,12 @@ HotstartStack = R6Class("HotstartStack",
       learners = assert_learners(as_learners(learners))
 
       walk(learners, function(learner) {
-        if (is.null(learner$model)) {
-          stopf("Learners must be trained before adding them to the hotstart stack.")
+        if (!is.null(get0("validate", learner))) {
+          error_input("Hotstart learners that did validation is currently not supported.")
+        } else if (is.null(learner$model)) {
+          error_input("Learners must be trained before adding them to the hotstart stack.")
         } else if (is_marshaled_model(learner$model)) {
-          stopf("Learners must be unmarshaled before adding them to the hotstart stack.")
+          error_input("Learners must be unmarshaled before adding them to the hotstart stack.")
         }
       })
 
@@ -130,14 +132,19 @@ HotstartStack = R6Class("HotstartStack",
     #'
     # @return `numeric()`.
     start_cost = function(learner, task_hash) {
-      if(!nrow(self$stack)) return(numeric(0))
+      if (!nrow(self$stack)) {
+        return(numeric(0))
+      }
       .learner_hash = learner_hotstart_hash(assert_learner(learner))
       .task_hash = assert_string(task_hash)
       hotstart_id = learner$param_set$ids(tags = "hotstart")
 
       set(self$stack, j = "cost", value = NA_real_)
-      cost = self$stack[list(.task_hash, .learner_hash), "cost" := map_dbl(get("start_learner"), function(l) calculate_cost(l, learner, hotstart_id)) , on = c("task_hash", "learner_hash")
-        ][, get("cost")]
+      cost = self$stack[
+        list(.task_hash, .learner_hash),
+        "cost" := map_dbl(get("start_learner"), function(l) calculate_cost(l, learner, hotstart_id)),
+        on = c("task_hash", "learner_hash")
+      ][, get("cost")]
       self$stack[, "cost" := NULL]
       cost
     },
@@ -154,13 +161,12 @@ HotstartStack = R6Class("HotstartStack",
     #'
     #' @param ... (ignored).
     print = function(...) {
-      catf(format(self))
-      print(self$stack, digits = 2)
+      cat_cli(cli_h1("{.cls {class(self)[1L]}}"))
+      print(self$stack, digits = 2L)
     }
   ),
 
   private = list(
-
     # Queries the stack for the start learner with the lowest cost of hot
     # starting the target `learner`. The start learner's state is copied to
     # `learner` and `learner` is returned. This method is internally used by
@@ -168,19 +174,23 @@ HotstartStack = R6Class("HotstartStack",
     # `learner_train(learner, task, row_ids, mode = 'retrain')` with the
     # returned learner.
     .start_learner = function(learner, task_hash) {
-      if(!nrow(self$stack)) return(NULL)
+      if (!nrow(self$stack)) {
+        return(NULL)
+      }
       .learner_hash = learner_hotstart_hash(assert_learner(learner))
-      .task_hash = assert_character(task_hash, len = 1)
+      .task_hash = assert_character(task_hash, len = 1L)
       hotstart_id = learner$param_set$ids(tags = "hotstart")
 
-      start_learner = self$stack[list(.task_hash, .learner_hash), on = c("task_hash", "learner_hash"), nomatch = NULL
-        ][, "cost" := map_dbl(start_learner, function(l) calculate_cost(l, learner, hotstart_id))
-        ][which_min(get("cost"), na_rm = TRUE), start_learner]
+      start_learner = self$stack[list(.task_hash, .learner_hash), on = c("task_hash", "learner_hash"), nomatch = NULL][,
+        "cost" := map_dbl(start_learner, function(l) calculate_cost(l, learner, hotstart_id))
+      ][which_min(get("cost"), na_rm = TRUE), start_learner]
 
       lg$debug("Found %i start learner(s) in hotstart stack of size %i.", length(start_learner), nrow(self$stack))
 
-      if (!length(start_learner)) return(NULL)
-      learner$state = start_learner[[1]]$state
+      if (!length(start_learner)) {
+        return(NULL)
+      }
+      learner$state = start_learner[[1L]]$state
       learner
     }
   )
@@ -195,14 +205,18 @@ HotstartStack = R6Class("HotstartStack",
 #' @return `numeric(1)`.
 #' @noRd
 calculate_cost = function(start_learner, learner, hotstart_id) {
-  if (is.null(start_learner) || !length(hotstart_id)) return(NA_real_)
+  if (is.null(start_learner) || !length(hotstart_id)) {
+    return(NA_real_)
+  }
 
   cost = learner$param_set$values[[hotstart_id]] - start_learner$param_set$values[[hotstart_id]]
-  if (cost == 0) return(-1)
+  if (cost == 0) {
+    return(-1)
+  }
 
-  if ("hotstart_backward" %in% learner$properties && "hotstart_forward" %in% learner$properties) {
+  if ("hotstart_backward" %chin% learner$properties && "hotstart_forward" %chin% learner$properties) {
     if (cost < 0) 0 else cost
-  } else if ("hotstart_backward" %in% learner$properties) {
+  } else if ("hotstart_backward" %chin% learner$properties) {
     if (cost < 0) 0 else NA_real_
   } else {
     if (cost > 0) cost else NA_real_

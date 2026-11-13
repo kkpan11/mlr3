@@ -25,7 +25,7 @@ A classification task for the German credit data set.
 The aim is to predict creditworthiness, labeled as "good" and "bad".
 Positive class is set to label "good".
 
-See example for the creation of a \link{MeasureClassifCosts} as described misclassification costs.
+See the example for the creation of a \link{MeasureClassifCosts} with the described misclassification costs.
 }
 \section{Dictionary}{
 
@@ -77,19 +77,19 @@ Reports in Mathematics, Physics and Chemistry 4, Department II, Beuth University
 }
 }
 
-Other Task: 
+Other Task:
 \code{\link{Task}},
 \code{\link{TaskClassif}},
 \code{\link{TaskRegr}},
 \code{\link{TaskSupervised}},
 \code{\link{TaskUnsupervised}},
+\code{\link{california_housing}},
 \code{\link{mlr_tasks}},
-\code{\link{mlr_tasks_boston_housing}},
 \code{\link{mlr_tasks_breast_cancer}},
+\code{\link{mlr_tasks_diabetes}},
 \code{\link{mlr_tasks_iris}},
 \code{\link{mlr_tasks_mtcars}},
 \code{\link{mlr_tasks_penguins}},
-\code{\link{mlr_tasks_pima}},
 \code{\link{mlr_tasks_sonar}},
 \code{\link{mlr_tasks_spam}},
 \code{\link{mlr_tasks_wine}},

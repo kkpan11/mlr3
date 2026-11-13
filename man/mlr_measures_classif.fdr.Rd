@@ -54,7 +54,7 @@ Empty ParamSet
 
 \code{as.data.table(mlr_measures)} for a complete table of all (also dynamically created) \link{Measure} implementations.
 
-Other classification measures: 
+Other classification measures:
 \code{\link{mlr_measures_classif.acc}},
 \code{\link{mlr_measures_classif.auc}},
 \code{\link{mlr_measures_classif.bacc}},
@@ -73,6 +73,7 @@ Other classification measures:
 \code{\link{mlr_measures_classif.mauc_au1u}},
 \code{\link{mlr_measures_classif.mauc_aunp}},
 \code{\link{mlr_measures_classif.mauc_aunu}},
+\code{\link{mlr_measures_classif.mauc_mu}},
 \code{\link{mlr_measures_classif.mbrier}},
 \code{\link{mlr_measures_classif.mcc}},
 \code{\link{mlr_measures_classif.npv}},
@@ -87,7 +88,7 @@ Other classification measures:
 \code{\link{mlr_measures_classif.tp}},
 \code{\link{mlr_measures_classif.tpr}}
 
-Other binary classification measures: 
+Other binary classification measures:
 \code{\link{mlr_measures_classif.auc}},
 \code{\link{mlr_measures_classif.bbrier}},
 \code{\link{mlr_measures_classif.dor}},
@@ -97,7 +98,6 @@ Other binary classification measures:
 \code{\link{mlr_measures_classif.fomr}},
 \code{\link{mlr_measures_classif.fp}},
 \code{\link{mlr_measures_classif.fpr}},
-\code{\link{mlr_measures_classif.mcc}},
 \code{\link{mlr_measures_classif.npv}},
 \code{\link{mlr_measures_classif.ppv}},
 \code{\link{mlr_measures_classif.prauc}},

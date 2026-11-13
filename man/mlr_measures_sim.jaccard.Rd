@@ -26,6 +26,11 @@ package \CRANpkg{mlr3measures}.
 If the measure is undefined for the input, \code{NaN} is returned.
 This can be customized by setting the field \code{na_value}.
 }
+\section{Parameters}{
+
+Empty ParamSet
+}
+
 \section{Dictionary}{
 
 This \link{Measure} can be instantiated via the \link[mlr3misc:Dictionary]{dictionary} \link{mlr_measures} or with the associated sugar function \code{\link[=msr]{msr()}}:
@@ -51,7 +56,7 @@ msr("sim.jaccard")
 
 \code{as.data.table(mlr_measures)} for a complete table of all (also dynamically created) \link{Measure} implementations.
 
-Other similarity measures: 
+Other similarity measures:
 \code{\link{mlr_measures_sim.phi}}
 }
 \concept{similarity measures}

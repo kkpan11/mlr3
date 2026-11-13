@@ -20,7 +20,17 @@ test_that("classification task", {
   iris$Species = NULL
   task_predict = as_task_unsupervised(iris, id = "Test")
   expect_task_unsupervised(task_predict)
-  expect_prediction(learner$predict(task_predict))
+  prediction = learner$predict(task_predict)
+  expect_prediction(prediction)
+  expect_equal(levels(prediction$response), task_train$class_names)
+  expect_equal(levels(prediction$truth), task_train$class_names)
+  expect_false(anyNA(prediction$response))
+  expect_true(allMissing(prediction$truth))
+
+  learner$predict_type = "prob"
+  prediction = learner$predict(task_predict)
+  expect_prediction(prediction)
+  expect_equal(colnames(prediction$prob), levels(prediction$truth))
 })
 
 test_that("empty classif task", {
@@ -33,7 +43,6 @@ test_that("empty classif task", {
   iris = iris[NULL, ]
   task_predict = as_task_unsupervised(iris, id = "Test")
   expect_task_unsupervised(task_predict)
-  expect_prediction(learner$predict(task_predict))
 })
 
 test_that("empty regr task", {
@@ -46,21 +55,21 @@ test_that("empty regr task", {
   mtcars = mtcars[NULL, ]
   task_predict = as_task_unsupervised(mtcars, id = "Test")
   expect_task_unsupervised(task_predict)
-  expect_prediction(learner$predict(task_predict))
 })
 
 test_that("fallback", {
   data("iris", package = "datasets")
   task_train = as_task_classif(iris, "Species")
   learner = lrn("classif.debug", error_predict = 1)
-  learner$encapsulate = c(predict = "evaluate")
-  learner$fallback = lrn("classif.featureless")
+  learner$encapsulate("evaluate", lrn("classif.featureless"))
   learner$train(task_train)
 
   iris$Species = NULL
   task_predict = as_task_unsupervised(iris, id = "Test")
   expect_task_unsupervised(task_predict)
-  expect_prediction(learner$predict(task_predict))
+  prediction = learner$predict(task_predict)
+  expect_prediction(prediction)
+  expect_false(anyNA(prediction$response))
 })
 
 test_that("assertions work", {

@@ -8,10 +8,11 @@ Measure to compare true observed response with predicted response in regression 
 }
 \details{
 The Bias is defined as \deqn{
-  \frac{1}{n} \sum_{i=1}^n w_i \left( t_i - r_i \right).
+  \frac{1}{n} \sum_{i=1}^n w_i \left( r_i - t_i \right),
 }{
-  weighted.mean(t - r, w).
+  weighted.mean(r - t, w),
 }
+where \eqn{w_i} are normalized sample weights.
 Good predictions score close to 0.
 }
 \note{
@@ -51,7 +52,7 @@ Empty ParamSet
 
 \code{as.data.table(mlr_measures)} for a complete table of all (also dynamically created) \link{Measure} implementations.
 
-Other regression measures: 
+Other regression measures:
 \code{\link{mlr_measures_regr.ktau}},
 \code{\link{mlr_measures_regr.mae}},
 \code{\link{mlr_measures_regr.mape}},
@@ -61,12 +62,8 @@ Other regression measures:
 \code{\link{mlr_measures_regr.mse}},
 \code{\link{mlr_measures_regr.msle}},
 \code{\link{mlr_measures_regr.pbias}},
-\code{\link{mlr_measures_regr.rae}},
 \code{\link{mlr_measures_regr.rmse}},
 \code{\link{mlr_measures_regr.rmsle}},
-\code{\link{mlr_measures_regr.rrse}},
-\code{\link{mlr_measures_regr.rse}},
-\code{\link{mlr_measures_regr.rsq}},
 \code{\link{mlr_measures_regr.sae}},
 \code{\link{mlr_measures_regr.smape}},
 \code{\link{mlr_measures_regr.srho}},

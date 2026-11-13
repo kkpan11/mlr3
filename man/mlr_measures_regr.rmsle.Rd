@@ -8,10 +8,11 @@ Measure to compare true observed response with predicted response in regression 
 }
 \details{
 The Root Mean Squared Log Error is defined as \deqn{
-  \sqrt{\frac{1}{n} \sum_{i=1}^n w_i \left( \ln (1 + t_i) - \ln (1 + r_i) \right)^2}.
+  \sqrt{\frac{1}{n} \sum_{i=1}^n w_i \left( \ln (1 + t_i) - \ln (1 + r_i) \right)^2},
 }{
-  sqrt(weighted.mean((log(1 + t) - log(1 + r))^2, w)).
+  sqrt(weighted.mean((log(1 + t) - log(1 + r))^2, w)),
 }
+where \eqn{w_i} are normalized sample weights.
 
 This measure is undefined if any element of \eqn{t} or \eqn{r} is less than or equal to \eqn{-1}.
 }
@@ -52,7 +53,7 @@ Empty ParamSet
 
 \code{as.data.table(mlr_measures)} for a complete table of all (also dynamically created) \link{Measure} implementations.
 
-Other regression measures: 
+Other regression measures:
 \code{\link{mlr_measures_regr.bias}},
 \code{\link{mlr_measures_regr.ktau}},
 \code{\link{mlr_measures_regr.mae}},
@@ -63,11 +64,7 @@ Other regression measures:
 \code{\link{mlr_measures_regr.mse}},
 \code{\link{mlr_measures_regr.msle}},
 \code{\link{mlr_measures_regr.pbias}},
-\code{\link{mlr_measures_regr.rae}},
 \code{\link{mlr_measures_regr.rmse}},
-\code{\link{mlr_measures_regr.rrse}},
-\code{\link{mlr_measures_regr.rse}},
-\code{\link{mlr_measures_regr.rsq}},
 \code{\link{mlr_measures_regr.sae}},
 \code{\link{mlr_measures_regr.smape}},
 \code{\link{mlr_measures_regr.srho}},

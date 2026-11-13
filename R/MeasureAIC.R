@@ -16,18 +16,20 @@
 #'
 #' @template seealso_measure
 #' @export
-MeasureAIC = R6Class("MeasureAIC",
+MeasureAIC = R6Class(
+  "MeasureAIC",
   inherit = Measure,
   public = list(
     #' @description
     #' Creates a new instance of this [R6][R6::R6Class] class.
     initialize = function() {
-      param_set = ps(k = p_int(lower = 0))
+      param_set = ps(k = p_dbl(lower = 0))
       super$initialize(
         id = "aic",
         task_type = NA_character_,
         param_set = param_set,
-        properties = c("na_score", "requires_learner", "requires_model"),
+        predict_sets = NULL,
+        properties = c("na_score", "requires_learner", "requires_model", "requires_no_prediction"),
         predict_type = NA_character_,
         minimize = TRUE,
         label = "Akaike Information Criterion",
@@ -39,12 +41,17 @@ MeasureAIC = R6Class("MeasureAIC",
   private = list(
     .score = function(prediction, learner, ...) {
       learner = learner$base_learner()
-      if ("loglik" %nin% learner$properties) {
-        return(NA_real_)
-      }
-
       k = self$param_set$values$k %??% 2
-      return(stats::AIC(learner$loglik(), k = k))
+
+      tryCatch(
+        {
+          stats::AIC(stats::logLik(learner$model), k = k)
+        },
+        error = function(e) {
+          warning_config("Learner '%s' does not support AIC calculation", learner$id)
+          NA_real_
+        }
+      )
     }
   )
 )

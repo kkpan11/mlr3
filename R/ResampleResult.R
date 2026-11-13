@@ -42,7 +42,8 @@
 #' # check for warnings and errors
 #' rr$warnings
 #' rr$errors
-ResampleResult = R6Class("ResampleResult",
+ResampleResult = R6Class(
+  "ResampleResult",
   public = list(
     #' @description
     #' Creates a new instance of this [R6][R6::R6Class] class.
@@ -71,13 +72,13 @@ ResampleResult = R6Class("ResampleResult",
     #' @param ... (ignored).
     print = function(...) {
       tab = self$score(measures = list(), conditions = TRUE)
-      setattr(tab, "class", c("data.table", "data.frame"))
+      set_data_table_class(tab)
       tab[, "warnings" := map(get("warnings"), length)]
       tab[, "errors" := map(get("errors"), length)]
-      catf("%s with %i resampling iterations",  format(self), self$iters)
+      cat_cli(cli_h1("{.cls {class(self)[1L]}} with {.val {self$iters}} resampling iterations"))
       if (nrow(tab)) {
         tab = remove_named(tab, c("task", "learner", "resampling", "prediction"))
-        print(tab, class = FALSE, row.names = FALSE, print.keys = FALSE, digits = 3)
+        print(tab, class = FALSE, row.names = FALSE, print.keys = FALSE, digits = 3L)
       }
     },
 
@@ -96,8 +97,10 @@ ResampleResult = R6Class("ResampleResult",
     #' If you calculate the performance on this prediction object directly, this is called micro averaging.
     #'
     #' @param predict_sets (`character()`)\cr
-    #' @return [Prediction].
     #'   Subset of `{"train", "test"}`.
+    #' @return [Prediction] or empty `list()` if no predictions are available.
+    #' @examples
+    #' rr$prediction()
     prediction = function(predict_sets = "test") {
       private$.data$prediction(private$.view, predict_sets)
     },
@@ -111,18 +114,22 @@ ResampleResult = R6Class("ResampleResult",
     #' `$prediction()`.
     #'
     #' @param predict_sets (`character()`)\cr
-    #'   Subset of `{"train", "test"}`.
+    #'   Subset of `{"train", "test", "internal_valid"}`.
     #' @return List of [Prediction] objects, one per element in `predict_sets`.
+    #' Or list of empty `list()`s if no predictions are available.
+    #' @examples
+    #' rr$predictions()
     predictions = function(predict_sets = "test") {
+      assert_subset(predict_sets, mlr_reflections$predict_sets, empty.ok = FALSE)
       private$.data$predictions(private$.view, predict_sets)
     },
 
     #' @description
     #' Returns a table with one row for each resampling iteration, including all involved objects:
-    #' [Task], [Learner], [Resampling], iteration number (`integer(1)`), and [Prediction].
+    #' [Task], [Learner], [Resampling], iteration number (`integer(1)`), and (if enabled)
+    #' one [Prediction] for each predict set of the [Learner].
     #' Additionally, a column with the individual (per resampling iteration) performance is added
-    #' for each [Measure] in `measures`,
-    #' named with the id of the respective measure id.
+    #' for each [Measure] in `measures`, named with the id of the respective measure id.
     #' If `measures` is `NULL`, `measures` defaults to the return value of [default_measures()].
     #'
     #' @param ids (`logical(1)`)\cr
@@ -134,16 +141,19 @@ ResampleResult = R6Class("ResampleResult",
     #'   Adds condition messages (`"warnings"`, `"errors"`) as extra
     #'   list columns of character vectors to the returned table
     #'
-    #' @param predict_sets (`character()`)\cr
-    #'   Vector of predict sets (`{"train", "test"}`) to construct the [Prediction] objects from.
-    #'   Default is `"test"`.
+    #' @param predictions (`logical(1)`)\cr
+    #'   Additionally return prediction objects, one column for each `predict_set` of the learner.
+    #'   Columns are named `"prediction_train"`, `"prediction_test"` and `"prediction_internal_valid"`,
+    #'   if present.
     #'
     #' @return [data.table::data.table()].
-    score = function(measures = NULL, ids = TRUE, conditions = FALSE, predict_sets = "test") {
-      measures = as_measures(measures, task_type = private$.data$task_type)
+    #' @examples
+    #' rr$score(msr("classif.acc"))
+    score = function(measures = NULL, ids = TRUE, conditions = FALSE, predictions = TRUE) {
+      measures = assert_measures(as_measures(measures, task_type = self$task_type))
       assert_flag(ids)
       assert_flag(conditions)
-      assert_subset(predict_sets, mlr_reflections$predict_sets)
+      assert_flag(predictions)
 
       tab = score_measures(self, measures, view = private$.view)
 
@@ -151,8 +161,10 @@ ResampleResult = R6Class("ResampleResult",
         set(tab, j = "task_id", value = ids(tab[["task"]]))
         set(tab, j = "learner_id", value = ids(tab[["learner"]]))
         set(tab, j = "resampling_id", value = ids(tab[["resampling"]]))
-        setcolorder(tab, c("task", "task_id", "learner", "learner_id", "resampling", "resampling_id",
-          "iteration", "prediction"))
+        setcolorder(
+          tab,
+          c("task", "task_id", "learner", "learner_id", "resampling", "resampling_id", "iteration", "prediction")
+        )
       }
 
       if (conditions) {
@@ -160,14 +172,61 @@ ResampleResult = R6Class("ResampleResult",
         set(tab, j = "errors", value = map(tab$learner, "errors"))
       }
 
-      set(tab, j = "prediction", value = as_predictions(tab$prediction, predict_sets))
+      if (predictions && nrow(tab)) {
+        predict_sets = intersect(mlr_reflections$predict_sets, tab$learner[[1L]]$predict_sets)
+        predict_cols = sprintf("prediction_%s", predict_sets)
+        for (i in seq_along(predict_sets)) {
+          set(
+            tab,
+            j = predict_cols[i],
+            value = map(tab$prediction, function(p) as_prediction(p[[predict_sets[i]]], check = FALSE))
+          )
+        }
+      } else {
+        predict_cols = character()
+      }
 
       set_data_table_class(tab, "rr_score")
 
-      cns = c("task", "task_id", "learner", "learner_id", "resampling", "resampling_id", "iteration",
-        "prediction", "warnings", "errors", ids(measures))
+      cns = c(
+        "task",
+        "task_id",
+        "learner",
+        "learner_id",
+        "resampling",
+        "resampling_id",
+        "iteration",
+        predict_cols,
+        "warnings",
+        "errors",
+        ids(measures)
+      )
       cns = intersect(cns, names(tab))
       tab[, cns, with = FALSE]
+    },
+
+    #' @description
+    #' Calculates the observation-wise loss via the [Measure]'s `obs_loss` method.
+    #' Returns a `data.table()` with an `iteration` column plus one numeric column for each measure,
+    #' named with the respective measure id.
+    #' If there is no observation-wise loss function for the measure, the column is filled with `NA_real_` values.
+    #' Note that some measures such as RMSE, do have an `$obs_loss`,
+    #' but they require an additional transformation after aggregation,
+    #' in this example taking the square-root.
+    #'
+    #' @param predict_sets (`character()`)\cr
+    #'   The predict sets.
+    #' @examples
+    #' rr$obs_loss(msr("classif.acc"))
+    obs_loss = function(measures = NULL, predict_sets = "test") {
+      measures = assert_measures(as_measures(measures, task_type = self$task_type))
+      map_dtr(
+        self$predictions(predict_sets),
+        function(pred) {
+          pred$obs_loss(measures)
+        },
+        .idcol = "iteration"
+      )
     },
 
     #' @description
@@ -176,8 +235,10 @@ ResampleResult = R6Class("ResampleResult",
     #' If `measures` is `NULL`, `measures` defaults to the return value of [default_measures()].
     #'
     #' @return Named `numeric()`.
+    #' @examples
+    #' rr$aggregate(msr("classif.acc"))
     aggregate = function(measures = NULL) {
-      measures = as_measures(measures, task_type = private$.data$task_type)
+      measures = assert_measures(as_measures(measures, task_type = self$task_type))
       resample_result_aggregate(self, measures)
     },
 
@@ -189,11 +250,19 @@ ResampleResult = R6Class("ResampleResult",
     #'
     #' @return
     #' Returns the object itself, but modified **by reference**.
-    #' You need to explicitly `$clone()` the object beforehand if you want to keeps
+    #' You need to explicitly `$clone()` the object beforehand if you want to keep
     #' the object in its previous state.
+    #' @examples
+    #' rr$filter(1L)
     filter = function(iters) {
-      iters = assert_integerish(iters, lower = 1L, upper = self$resampling$iters,
-        any.missing = FALSE, unique = TRUE, coerce = TRUE)
+      iters = assert_integerish(
+        iters,
+        lower = 1L,
+        upper = self$resampling$iters,
+        any.missing = FALSE,
+        unique = TRUE,
+        coerce = TRUE
+      )
 
       private$.data = private$.data$clone(deep = TRUE)
       fact = private$.data$data$fact
@@ -218,7 +287,7 @@ ResampleResult = R6Class("ResampleResult",
     #'
     #' @return
     #' Returns the object itself, but modified **by reference**.
-    #' You need to explicitly `$clone()` the object beforehand if you want to keeps
+    #' You need to explicitly `$clone()` the object beforehand if you want to keep
     #' the object in its previous state.
     discard = function(backends = FALSE, models = FALSE) {
       private$.data$discard(backends = backends, models = models)
@@ -228,6 +297,8 @@ ResampleResult = R6Class("ResampleResult",
     #' Marshals all stored models.
     #' @param ... (any)\cr
     #'   Additional arguments passed to [`marshal_model()`].
+    #' @examples
+    #' rr$marshal()
     marshal = function(...) {
       private$.data$marshal(...)
     },
@@ -235,8 +306,28 @@ ResampleResult = R6Class("ResampleResult",
     #' Unmarshals all stored models.
     #' @param ... (any)\cr
     #'   Additional arguments passed to [`unmarshal_model()`].
+    #' @examples
+    #' rr$unmarshal()
     unmarshal = function(...) {
       private$.data$unmarshal(...)
+    },
+
+    #' @description
+    #' Sets the threshold for the response prediction of classification learners, given they have
+    #' output a probability prediction for a binary classification task.
+    #' This modifies the object in-place.
+    #' @param threshold (`numeric(1)`)\cr
+    #'   Threshold value.
+    #' @template param_ties_method
+    #' @examples
+    #' learner = lrn("classif.rpart", predict_type = "prob")
+    #' rr = resample(tsk("sonar"), learner, rsmp("cv", folds = 3))
+    #' rr$set_threshold(0.6)
+    set_threshold = function(threshold, ties_method = "random") {
+      if (!self$task_type == "classif") {
+        error_input("Can only change the threshold for classification problems, but task type is '%s'.", self$task_type)
+      }
+      private$.data$set_threshold(self$uhash, threshold, ties_method)
     }
   ),
 
@@ -304,9 +395,16 @@ ResampleResult = R6Class("ResampleResult",
       private$.data$learners(private$.view)$learner
     },
 
+    #' @field data_extra (list())\cr
+    #' Additional data stored in the [ResampleResult].
+    data_extra = function(rhs) {
+      assert_ro_binding(rhs)
+      private$.data$data_extra(private$.view)
+    },
+
     #' @field warnings ([data.table::data.table()])\cr
     #' A table with all warning messages.
-    #' Column names are `"iteration"` and `"msg"`.
+    #' Column names are `"iteration"` and `"condition"`.
     #' Note that there can be multiple rows per resampling iteration if multiple warnings have been recorded.
     warnings = function(rhs) {
       assert_ro_binding(rhs)
@@ -315,7 +413,7 @@ ResampleResult = R6Class("ResampleResult",
 
     #' @field errors ([data.table::data.table()])\cr
     #' A table with all error messages.
-    #' Column names are `"iteration"` and `"msg"`.
+    #' Column names are `"iteration"` and `"condition"`.
     #' Note that there can be multiple rows per resampling iteration if multiple errors have been recorded.
     errors = function(rhs) {
       assert_ro_binding(rhs)
@@ -339,16 +437,14 @@ ResampleResult = R6Class("ResampleResult",
 )
 
 #' @export
-as.data.table.ResampleResult = function(x, ..., predict_sets = "test") { # nolint
+# nolint next
+as.data.table.ResampleResult = function(x, ..., predict_sets = "test") {
   private = get_private(x)
   tab = private$.data$as_data_table(view = private$.view, predict_sets = predict_sets)
-  tab[, c("task", "learner", "resampling", "iteration", "prediction"), with = FALSE]
+  cns = c("task", "learner", "resampling", "iteration", "prediction", if ("data_extra" %in% names(tab)) "data_extra")
+  tab[, cns, with = FALSE]
 }
 
-# #' @export
-# format_list_item.ResampleResult = function(x, ...) { # nolint
-#   sprintf("<rr[%i]>", x$iters)
-# }
 
 #' @export
 c.ResampleResult = function(...) {
@@ -357,10 +453,19 @@ c.ResampleResult = function(...) {
 
 
 resample_result_aggregate = function(rr, measures) {
-  set_names(map_dbl(measures, function(m) m$aggregate(rr)), ids(measures))
+  unlist(map(unname(measures), function(m) {
+    val = m$aggregate(rr)
+    # CIs in mlr3inferr return more than 1 value and are already named
+    if (length(val) == 1L) {
+      return(set_names(val, m$id))
+    }
+    val
+  })) %??%
+    set_names(numeric(), character())
 }
 
 #' @export
 print.rr_score = function(x, ...) {
-  print_data_table(x, c("task", "learner", "resampling", "prediction"))
+  predict_cols = sprintf("prediction_%s", mlr_reflections$predict_sets)
+  print_data_table(x, c("task", "learner", "resampling", predict_cols))
 }

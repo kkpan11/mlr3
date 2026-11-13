@@ -8,10 +8,11 @@ Measure to compare true observed response with predicted response in regression 
 }
 \details{
 The Sum of Squared Errors is defined as \deqn{
-  \sum_{i=1}^n \left( t_i - r_i \right)^2.
+  \sum_{i=1}^n w_i \left( t_i - r_i \right)^2.
 }{
-  sum((t - r)^2).
+  sum(w * (t - r)^2).
 }
+where \eqn{w_i} are unnormalized weights for each observation \eqn{x_i}, defaulting to 1.
 }
 \note{
 The score function calls \code{\link[mlr3measures:sse]{mlr3measures::sse()}} from package \CRANpkg{mlr3measures}.
@@ -50,7 +51,7 @@ Empty ParamSet
 
 \code{as.data.table(mlr_measures)} for a complete table of all (also dynamically created) \link{Measure} implementations.
 
-Other regression measures: 
+Other regression measures:
 \code{\link{mlr_measures_regr.bias}},
 \code{\link{mlr_measures_regr.ktau}},
 \code{\link{mlr_measures_regr.mae}},
@@ -61,12 +62,8 @@ Other regression measures:
 \code{\link{mlr_measures_regr.mse}},
 \code{\link{mlr_measures_regr.msle}},
 \code{\link{mlr_measures_regr.pbias}},
-\code{\link{mlr_measures_regr.rae}},
 \code{\link{mlr_measures_regr.rmse}},
 \code{\link{mlr_measures_regr.rmsle}},
-\code{\link{mlr_measures_regr.rrse}},
-\code{\link{mlr_measures_regr.rse}},
-\code{\link{mlr_measures_regr.rsq}},
 \code{\link{mlr_measures_regr.sae}},
 \code{\link{mlr_measures_regr.smape}},
 \code{\link{mlr_measures_regr.srho}}

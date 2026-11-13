@@ -9,7 +9,7 @@
 #' The aim is to predict creditworthiness, labeled as "good" and "bad".
 #' Positive class is set to label "good".
 #'
-#' See example for the creation of a [MeasureClassifCosts] as described misclassification costs.
+#' See the example for the creation of a [MeasureClassifCosts] with the described misclassification costs.
 #'
 #' @templateVar id german_credit
 #' @template task
@@ -42,8 +42,7 @@ NULL
 
 load_task_german_credit = function(id = "german_credit") {
   b = as_data_backend(readRDS(system.file("extdata", "german_credit.rds", package = "mlr3")))
-  task = TaskClassif$new(id, b, target = "credit_risk", positive = "good",
-    label = "German Credit")
+  task = TaskClassif$new(id, b, target = "credit_risk", positive = "good", label = "German Credit")
   b$hash = task$man = "mlr3::mlr_tasks_german_credit"
   task
 }

@@ -1,19 +1,21 @@
 #' @import data.table
 #' @import checkmate
+#' @import cli
 #' @import paradox
 #' @import mlr3misc
 #' @import palmerpenguins
 #' @importFrom R6 R6Class is.R6
 #' @importFrom utils data head tail getFromNamespace packageVersion
 #' @importFrom graphics plot
-#' @importFrom stats predict rnorm runif sd contr.treatment model.frame terms
+#' @importFrom stats predict rnorm runif sd contr.treatment model.frame terms quantile weighted.mean
 #' @importFrom uuid UUIDgenerate
 #' @importFrom parallelly availableCores
 #' @importFrom future nbrOfWorkers plan
-#' @importFrom RhpcBLASctl blas_set_num_threads blas_get_num_procs
+#' @importFrom methods formalArgs
 #'
 #' @section Learn mlr3:
 #' * Book on mlr3: \url{https://mlr3book.mlr-org.com}
+
 #' * Use cases and examples gallery: \url{https://mlr3gallery.mlr-org.com}
 #' * Cheat Sheets: \url{https://github.com/mlr-org/mlr3cheatsheets}
 #'
@@ -51,12 +53,42 @@
 #' * `"mlr3.debug"`: If set to `TRUE`, parallelization via \CRANpkg{future} is disabled to simplify
 #'   debugging and provide more concise tracebacks.
 #'   Note that results computed in debug mode use a different seeding mechanism and are **not reproducible**.
-#' * `"mlr3.allow_utf8_names"`: If set to `TRUE`, checks on the feature names are relaxed, allowing
-#'   non-ascii characters in column names. This is an experimental and temporal option to
-#'   pave the way for text analysis, and will likely be removed in a future version of the package.
-#'   analysis.
 #' * `"mlr3.warn_version_mismatch"`: Set to `FALSE` to silence warnings raised during predict if a learner has been
 #'   trained with a different version version of mlr3.
+#' * `"mlr3.prob_as_default"`: Set to `TRUE` to set the predict type of classification learners to
+#'   `"prob"` by default (if they support it).
+#' * `"mlr3.mirai_parallelization"`: Compute profile to use for parallelization with \CRANpkg{mirai}.
+#'   Defaults to `"mlr3_parallelization"`.
+#' * `"mlr3.mirai_encapsulation"`: Compute profile to use for encapsulation with \CRANpkg{mirai}.
+#'   Defaults to `"mlr3_encapsulation"`.
+#' * `"mlr3.print_class_ratio_threshold"`: Maximum number of rows for which class ratios are computed
+#'   when printing a classification task. For tasks with more rows, only class names are shown.
+#'   Defaults to `1000000`.
+#'
+#' @section Error Classes:
+#' * `Mlr3Error`: The base mlr3 error class.
+#' * `Mlr3ErrorConfig`: This error signals that the user has misconfigured something before the current call,
+#'   e.g. calling `$train()`, `$predict()`, or [resample()] with an untrained learner, an uninstantiated resampling,
+#'   an unsupported predict type, or with `store_models` or `store_backends` disabled although a measure requires them.
+#'   Not setting something up beforehand also counts as a misconfiguration.
+#'   This error is also raised when a configuration step itself fails, e.g. assigning an invalid `$predict_type`.
+#'   By default, this error is not caught by encapsulation and does not trigger the fallback learner,
+#'   because retrying with a fallback cannot fix a misconfiguration.
+#'   A `when` handler registered via [Learner]'s `$encapsulate()` method can override this.
+#' * `Mlr3ErrorInput`: This error signals that the arguments or data passed to the current call are invalid,
+#'   e.g. an empty task passed to `$train()`, or malformed prediction data.
+#'   Unlike `Mlr3ErrorConfig`, this error is caught by encapsulation and triggers the fallback learner
+#'   when it is raised inside the encapsulated train or predict step,
+#'   because a fallback can legitimately step in when a learner cannot handle the given data.
+#' * `Mlr3ErrorLearner`: The base error class for errors related to the learner.
+#' * `Mlr3ErrorLearnerTrain`: This error signals that the learner failed to train the model.
+#' * `Mlr3ErrorLearnerPredict`: This error signals that something went wrong during prediction.
+#' * `Mlr3ErrorTimeout`: This error signals that the encapsulation during train or predict timed out.
+#'
+#' @section Warning Classes:
+#' * `Mlr3Warning`: The base mlr3 warning class.
+#' * `Mlr3WarningConfig`: This warning signals that the user has misconfigured something.
+#' * `Mlr3WarningInput`: This warning signals that the input to the function is invalid.
 #'
 #' @references
 #' `r tools::toRd(citation("mlr3"))`
@@ -75,8 +107,13 @@ dummy_import = function() {
   # nocov start
   backports::import(pkgname)
 
+  # callbacks
+  x = utils::getFromNamespace("mlr_callbacks", ns = "mlr3misc")
+  x$add("mlr3.model_extractor", load_callback_model_extractor)
+  x$add("mlr3.holdout_task", load_callback_holdout_task)
+
   # setup logger
-  lg = lgr::get_logger(pkgname)
+  lg = lgr::get_logger("mlr3/core")
   assign("lg", lg, envir = parent.env(environment()))
   f = function(event) {
     event$msg = paste0("[mlr3] ", event$msg)
@@ -88,10 +125,8 @@ dummy_import = function() {
   }
 
   register_namespace_callback(pkgname, "mlr", function(...) {
-    warning("Packages 'mlr3' and 'mlr' are conflicting and should not be loaded in the same session")
+    warning_mlr3("Packages 'mlr3' and 'mlr' are conflicting and should not be loaded in the same session")
   })
-
-  mlr_reflections$loggers[["mlr3"]] = lg
 } # nocov end
 
 leanify_package()

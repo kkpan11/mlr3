@@ -3,29 +3,34 @@
 #' @name marshaling
 #'
 #' @description
-#' Marshaling is the process of processing the model of a trained [`Learner`] so it an be successfully serialized and
-#' deserialized. The naming is inspired by the [marshal package](https://github.com/HenrikBengtsson/marshal) and we
+#' Marshaling is the process of processing the model of a trained [`Learner`] so it can be successfully serialized and
+#' deserialized. The naming is inspired by the [marshal package](https://github.com/futureverse/marshal) and we
 #' plan to fully migrate to this package once it is on CRAN.
-#' The current implementation should therfore be considered as a temporary solution and is likely
+#' The current implementation should therefore be considered as a temporary solution and is likely
 #' to change in the future.
 #'
 #' The central functions (and the only methods that are used by `mlr3` internally) are:
 #' * the S3 generic `marshal_model(model, inplace, ...)`.
 #'   Which takes in a model and returns it in marshaled form.
-#'   This means, that the resulting object can be serialized and de-serialzed without loss of information.
-#'   The marshaled object should be a list with named elements `marshaled` and `packages`, where the former contains
-#'   the marshaled object, and the latter the package that contains the packages requirrd to unmarshal.
+#'   This means, that the resulting object can be serialized and de-serialized without loss of information.
+#'   If a model is serializable anyway, nothing has to be implemented and the generic will fall back to the
+#'   default implementation of `marshal_model`, which is to return the object as-is.
+#'   Otherwise, the marshaled object should be a list with named elements `marshaled` and
+#'   `packages`, where the former contains
+#'   the marshaled object, and the latter the package that contains the packages required to unmarshal.
 #'   Most importantly, this list should contain the package that contains the `unmarshal_model` method.
 #'   The returned object should have the classes of the original object with the suffix `"_marshaled"` appended and the
 #'   root class should be set to `"marshaled"`.
 #' * the S3 generic `unmarshal_model(model, inplace ...)`.
 #'   Which takes in the marshaled model and returns it in unmarshaled form.
-#'   The generic takes care that the packages specified during `"marshal"` are loaded, and errs if they are not availabe.
+#'   The generic takes care that the packages specified during `"marshal"` are loaded,
+#'   and errs if they are not available.
 #'   Calling this function on a marshaled model should reconstruct the original model, i.e.
-#'   `unmarshal_model(marshal_model(x))` should return `x` as is.
+#'   `unmarshal_model(marshal_model(x))` should return `x`.
+#'   The default implementation of this generic returns `x` as-is.
 #' * the function `is_marshaled_model(model)`.
 #'   This (helper) function returns `TRUE` if the model inherits from class `"marshaled"` and `FALSE` otherwise.
-#'   Note that it is not guarateed that `is_marshaled_model(marshal_model(x))` returns `TRUE`.
+#'   Note that it is not guaranteed that `is_marshaled_model(marshal_model(x))` returns `TRUE`.
 #'   This is because the default `marshal_model(x)` returns `x` as-is.
 #'
 #' For both `marshal_model` and `unmarshal_model`, the `inplace` argument determines whether in-place marshaling
@@ -39,7 +44,8 @@
 #' methods for the class of the learner's model and tag the learner with the `"marshal"` property.
 #' To make marshaling accessible in an R6-manner, you should also add the public methods `$marshal()`, `$unmarshal()`
 #' and the active binding `$marshaled`.
-#' To make this as convenient as possible, the functions `learner_marshal(.learner, ...)`, `learner_unmarshal(.learner, ...)`
+#' To make this as convenient as possible, the functions `learner_marshal(.learner, ...)`,
+#' `learner_unmarshal(.learner, ...)`
 #' and `learner_marshaled(.learner)` are provided and can be called from the public methods.
 #'
 #' You can verify whether you have correctly implemented marshaling by using the internal test helper
@@ -51,14 +57,13 @@
 #'   The learner.
 #' @param ... (any)\cr
 #'   Additional parameters, currently unused.
+#' @param model (any)\cr
+#'   Model to marshal.
+#' @param inplace (`logical(1)`)\cr
+#'   Whether to marshal in-place.
 #'
-#' @keywords internal
 #' @export
 learner_unmarshal = function(.learner, ...) {
-  # no need to check for 'marshal' property as this method should only be available for such learners
-  if (is.null(.learner$model)) {
-    stopf("Cannot unmarshal, Learner '%s' has not been trained yet", .learner$id)
-  }
   # this will do nothing if the model was not marshaled
   .learner$model = unmarshal_model(model = .learner$model, inplace = TRUE, ...)
   invisible(.learner)
@@ -67,10 +72,6 @@ learner_unmarshal = function(.learner, ...) {
 #' @rdname marshaling
 #' @export
 learner_marshal = function(.learner, ...) {
-  # no need to check for 'marshal' property as this method should only be available for such learners
-  if (is.null(.learner$model)) {
-    stopf("Cannot marshal, Learner '%s' has not been trained yet", .learner$id)
-  }
   # this will do nothing if the model was already marshaled
   .learner$model = marshal_model(model = .learner$model, inplace = TRUE, ...)
   invisible(.learner)
@@ -79,10 +80,6 @@ learner_marshal = function(.learner, ...) {
 #' @rdname marshaling
 #' @export
 learner_marshaled = function(.learner) {
-  # no need to check for 'marshal' property as this method should only be available for such learners
-  if (is.null(.learner$model)) {
-    return(FALSE)
-  }
   is_marshaled_model(model = .learner$model)
 }
 
@@ -106,7 +103,7 @@ unmarshal_model = function(model, inplace = FALSE, ...) {
 #' @rdname marshaling
 #' @export
 is_marshaled_model = function(model) {
-  test_class(model, "marshaled")
+  inherits(model, "marshaled")
 }
 
 #' @export

@@ -16,7 +16,8 @@
 #'
 #' @template seealso_measure
 #' @export
-MeasureBIC = R6Class("MeasureBIC",
+MeasureBIC = R6Class(
+  "MeasureBIC",
   inherit = Measure,
   public = list(
     #' @description
@@ -25,7 +26,8 @@ MeasureBIC = R6Class("MeasureBIC",
       super$initialize(
         id = "bic",
         task_type = NA_character_,
-        properties = c("na_score", "requires_learner", "requires_model"),
+        properties = c("na_score", "requires_learner", "requires_model", "requires_no_prediction"),
+        predict_sets = NULL,
         predict_type = NA_character_,
         minimize = TRUE,
         label = "Bayesian Information Criterion",
@@ -37,11 +39,16 @@ MeasureBIC = R6Class("MeasureBIC",
   private = list(
     .score = function(prediction, learner, ...) {
       learner = learner$base_learner()
-      if ("loglik" %nin% learner$properties) {
-        return(NA_real_)
-      }
 
-      return(stats::BIC(learner$loglik()))
+      tryCatch(
+        {
+          stats::BIC(stats::logLik(learner$model))
+        },
+        error = function(e) {
+          warning_config("Learner '%s' does not support BIC calculation", learner$id)
+          NA_real_
+        }
+      )
     }
   )
 )

@@ -1,6 +1,6 @@
 test_that("re-instantiating", {
   t1 = tsk("iris")
-  t2 = tsk("boston_housing")
+  t2 = tsk("california_housing")
   r = rsmp("cv", folds = 2)
 
   expect_resampling(r$instantiate(t1), task = t1)
@@ -27,14 +27,20 @@ test_that("param_vals", {
 
   expect_resampling(r)
 
-  expect_error({
-    r$param_set$values = list(repeats = 10L)
-    r$param_set$get_values()
-  }, "ratio")
+  expect_error(
+    {
+      r$param_set$values = list(repeats = 10L)
+      r$param_set$get_values()
+    },
+    "ratio"
+  )
 
-  expect_error({
-    r$param_set$values = list(ratio = 0.5, repeats = 10L, foobar = 12)
-  }, "foobar")
+  expect_error(
+    {
+      r$param_set$values = list(ratio = 0.5, repeats = 10L, foobar = 12)
+    },
+    "foobar"
+  )
 })
 
 test_that("hashing", {
@@ -44,14 +50,17 @@ test_that("hashing", {
   for (key in keys) {
     r = rsmp(key)
 
+    # nolint next
     with_seed(123L, r$instantiate(task))
     hash = r$hash
     expect_string(hash, pattern = "^[a-z0-9]+$")
 
+    # nolint next
     with_seed(123L, r$instantiate(task))
     expect_identical(r$hash, hash)
 
     if (key != "insample") {
+      # nolint next
       with_seed(124L, r$instantiate(task))
       expect_false(identical(r$hash, hash))
     }
@@ -106,20 +115,6 @@ test_that("as.data.table.Resampling", {
   expect_integer(tab$row_id, any.missing = FALSE)
 })
 
-test_that("Evaluation on holdout set", {
-  task = tsk("sonar")
-  rids = task$row_ids
-  task$row_roles$holdout = tail(rids, 10)
-  task$row_roles$use = head(rids, -10)
-  learner = lrn("classif.rpart", predict_sets = c("test", "holdout"))
-  rr = resample(task, learner, rsmp("holdout"))
-
-  m1 = msr("classif.acc", id = "acc.test", predict_sets = "test")
-  m2 = msr("classif.acc", id = "acc.holdout", predict_sets = "holdout")
-
-  expect_equal(rr$aggregate(list(m1, m2)), c(rr$prediction("test")$score(m1), rr$prediction("holdout")$score(m2)))
-})
-
 test_that("custom_cv", {
   task = tsk("penguins")
   ccv = rsmp("custom_cv")
@@ -159,4 +154,16 @@ test_that("loo with groups", {
   islands = cbind(row_id = task$row_ids, task$data(cols = "island"))
   tab = merge(as.data.table(loo), islands, by = "row_id")
   expect_true(all(tab[, .(n_islands = uniqueN(island)), by = row_id]$n_islands == 1L))
+})
+
+test_that("task_row_hash in Resampling works correctly", {
+  task = tsk("penguins")
+  resampling = rsmp("cv", folds = 2)
+
+  # task_row_hash should be NA before instantiation
+  expect_identical(resampling$task_row_hash, NA_character_)
+
+  # task_row_hash should be set after instantiation
+  resampling$instantiate(task)
+  expect_identical(resampling$task_row_hash, task$row_hash)
 })

@@ -6,7 +6,7 @@
 \alias{mlr3-package}
 \title{mlr3: Machine Learning in R - Next Generation}
 \description{
-\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+\if{html}{\figure{logo.svg}{options: style='float: right' alt='logo' width='120'}}
 
 Efficient, object-oriented programming on the building blocks of machine learning. Provides 'R6' objects for tasks, learners, resamplings, and measures. The package is geared towards scalability and larger datasets by supporting parallelization and out-of-memory data-backends like databases. While 'mlr3' focuses on the core computational operations, add-on packages provide additional functionality.
 }
@@ -63,12 +63,50 @@ parallelization with \CRANpkg{future}. Defaults to 1.
 \item \code{"mlr3.debug"}: If set to \code{TRUE}, parallelization via \CRANpkg{future} is disabled to simplify
 debugging and provide more concise tracebacks.
 Note that results computed in debug mode use a different seeding mechanism and are \strong{not reproducible}.
-\item \code{"mlr3.allow_utf8_names"}: If set to \code{TRUE}, checks on the feature names are relaxed, allowing
-non-ascii characters in column names. This is an experimental and temporal option to
-pave the way for text analysis, and will likely be removed in a future version of the package.
-analysis.
 \item \code{"mlr3.warn_version_mismatch"}: Set to \code{FALSE} to silence warnings raised during predict if a learner has been
 trained with a different version version of mlr3.
+\item \code{"mlr3.prob_as_default"}: Set to \code{TRUE} to set the predict type of classification learners to
+\code{"prob"} by default (if they support it).
+\item \code{"mlr3.mirai_parallelization"}: Compute profile to use for parallelization with \CRANpkg{mirai}.
+Defaults to \code{"mlr3_parallelization"}.
+\item \code{"mlr3.mirai_encapsulation"}: Compute profile to use for encapsulation with \CRANpkg{mirai}.
+Defaults to \code{"mlr3_encapsulation"}.
+\item \code{"mlr3.print_class_ratio_threshold"}: Maximum number of rows for which class ratios are computed
+when printing a classification task. For tasks with more rows, only class names are shown.
+Defaults to \code{1000000}.
+}
+}
+
+\section{Error Classes}{
+
+\itemize{
+\item \code{Mlr3Error}: The base mlr3 error class.
+\item \code{Mlr3ErrorConfig}: This error signals that the user has misconfigured something before the current call,
+e.g. calling \verb{$train()}, \verb{$predict()}, or \code{\link[=resample]{resample()}} with an untrained learner, an uninstantiated resampling,
+an unsupported predict type, or with \code{store_models} or \code{store_backends} disabled although a measure requires them.
+Not setting something up beforehand also counts as a misconfiguration.
+This error is also raised when a configuration step itself fails, e.g. assigning an invalid \verb{$predict_type}.
+By default, this error is not caught by encapsulation and does not trigger the fallback learner,
+because retrying with a fallback cannot fix a misconfiguration.
+A \code{when} handler registered via \link{Learner}'s \verb{$encapsulate()} method can override this.
+\item \code{Mlr3ErrorInput}: This error signals that the arguments or data passed to the current call are invalid,
+e.g. an empty task passed to \verb{$train()}, or malformed prediction data.
+Unlike \code{Mlr3ErrorConfig}, this error is caught by encapsulation and triggers the fallback learner
+when it is raised inside the encapsulated train or predict step,
+because a fallback can legitimately step in when a learner cannot handle the given data.
+\item \code{Mlr3ErrorLearner}: The base error class for errors related to the learner.
+\item \code{Mlr3ErrorLearnerTrain}: This error signals that the learner failed to train the model.
+\item \code{Mlr3ErrorLearnerPredict}: This error signals that something went wrong during prediction.
+\item \code{Mlr3ErrorTimeout}: This error signals that the encapsulation during train or predict timed out.
+}
+}
+
+\section{Warning Classes}{
+
+\itemize{
+\item \code{Mlr3Warning}: The base mlr3 warning class.
+\item \code{Mlr3WarningConfig}: This warning signals that the user has misconfigured something.
+\item \code{Mlr3WarningInput}: This warning signals that the input to the function is invalid.
 }
 }
 
@@ -76,7 +114,8 @@ trained with a different version version of mlr3.
 Lang M, Binder M, Richter J, Schratz P, Pfisterer F, Coors S, Au Q, Casalicchio G, Kotthoff L, Bischl B (2019).
 \dQuote{mlr3: A modern object-oriented machine learning framework in R.}
 \emph{Journal of Open Source Software}.
-\doi{10.21105/joss.01903}, \url{https://joss.theoj.org/papers/10.21105/joss.01903}.
+\doi{10.21105/joss.01903}.
+\url{https://joss.theoj.org/papers/10.21105/joss.01903}.
 }
 \seealso{
 Useful links:
@@ -88,17 +127,19 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Michel Lang \email{michellang@gmail.com} (\href{https://orcid.org/0000-0001-9754-0393}{ORCID})
+\strong{Maintainer}: Marc Becker \email{marcbecker@posteo.de} (\href{https://orcid.org/0000-0002-8115-0400}{ORCID})
 
 Authors:
 \itemize{
+  \item Marc Becker \email{marcbecker@posteo.de} (\href{https://orcid.org/0000-0002-8115-0400}{ORCID})
+  \item Michel Lang \email{michellang@gmail.com} (\href{https://orcid.org/0000-0001-9754-0393}{ORCID})
   \item Bernd Bischl \email{bernd_bischl@gmx.net} (\href{https://orcid.org/0000-0001-6002-6980}{ORCID})
   \item Jakob Richter \email{jakob1richter@gmail.com} (\href{https://orcid.org/0000-0003-4481-5554}{ORCID})
   \item Patrick Schratz \email{patrick.schratz@gmail.com} (\href{https://orcid.org/0000-0003-0748-6624}{ORCID})
   \item Martin Binder \email{mlr.developer@mb706.com}
   \item Florian Pfisterer \email{pfistererf@googlemail.com} (\href{https://orcid.org/0000-0001-8867-762X}{ORCID})
   \item Raphael Sonabend \email{raphaelsonabend@gmail.com} (\href{https://orcid.org/0000-0001-9225-4654}{ORCID})
-  \item Marc Becker \email{marcbecker@posteo.de} (\href{https://orcid.org/0000-0002-8115-0400}{ORCID})
+  \item Sebastian Fischer \email{sebf.fischer@gmail.com} (\href{https://orcid.org/0000-0002-9609-3197}{ORCID})
 }
 
 Other contributors:
@@ -107,7 +148,10 @@ Other contributors:
   \item Stefan Coors \email{mail@stefancoors.de} (\href{https://orcid.org/0000-0002-7465-2146}{ORCID}) [contributor]
   \item Quay Au \email{quayau@gmail.com} (\href{https://orcid.org/0000-0002-5252-8902}{ORCID}) [contributor]
   \item Lennart Schneider \email{lennart.sch@web.de} (\href{https://orcid.org/0000-0003-4152-5308}{ORCID}) [contributor]
-  \item Sebastian Fischer \email{sebf.fischer@gmail.com} (\href{https://orcid.org/0000-0002-9609-3197}{ORCID}) [contributor]
+  \item Lona Koers \email{lona.koers@gmail.com} [contributor]
+  \item John Zobolas \email{bblodfon@gmail.com} (\href{https://orcid.org/0000-0002-3609-8674}{ORCID}) [contributor]
+  \item Maximilian Mücke \email{muecke.maximilian@gmail.com} (\href{https://orcid.org/0009-0000-9432-9795}{ORCID}) [contributor]
+  \item Keno Mersmann \email{keno.mersmann@gmail.com} [contributor]
 }
 
 }

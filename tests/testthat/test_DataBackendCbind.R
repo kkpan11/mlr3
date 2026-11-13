@@ -17,7 +17,6 @@ test_that("DataBackendCbind", {
   x = b$missings(b$rownames, c("Petal.Width", "Petal.Length"))
   expect_equal(x, set_names(c(0L, 30L), c("Petal.Width", "Petal.Length")))
 
-
   expect_equal(b$col_hashes, c(b1$col_hashes, b2$col_hashes)[setdiff(b$colnames, b$primary_key)])
 })
 
@@ -50,8 +49,6 @@ test_that("cbind backends with same columns", {
   expect_true(allMissing(data$Sepal.Width))
 
   expect_equal(b$col_hashes, insert_named(b1$col_hashes, b2$col_hashes)[setdiff(b$colnames, b$primary_key)])
-
-
 })
 
 test_that("Backends with different rows", {
@@ -69,26 +66,4 @@ test_that("Backends with different rows", {
   expect_data_table(b$head(Inf), nrows = 20, ncols = 6)
 
   expect_equal(b$col_hashes, c(b1$col_hashes, b2$col_hashes)[setdiff(b$colnames, b$primary_key)])
-
-})
-
-test_that("Backends with mixed data_formats", {
-  requireNamespace("Matrix")
-  i = c(1, 3:8, 20)
-  j = c(2, 9, 6:10, 5)
-  x = 7 * (1:8)
-  A = Matrix::sparseMatrix(i, j, x = x)
-  colnames(A) = letters[1:10]
-  X = cbind(A, Y = rnorm(nrow(A)))
-  task = TaskRegr$new("sparse", X, "Y")
-
-  rr = resample(task, lrn("regr.rpart"), rsmp("holdout"))
-  expect_number(rr$aggregate(msr("regr.mse")))
-
-  task$cbind(data.frame(z = runif(task$nrow)))
-  expect_backend(task$backend)
-  expect_set_equal(task$backend$data_formats, "data.table")
-
-  rr = resample(task, lrn("regr.rpart"), rsmp("holdout"))
-  expect_number(rr$aggregate(msr("regr.mse")))
 })

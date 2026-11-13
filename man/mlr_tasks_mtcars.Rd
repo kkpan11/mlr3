@@ -9,7 +9,7 @@
 \description{
 A regression task for the \link[datasets:mtcars]{datasets::mtcars} data set.
 Target variable is \code{mpg} (Miles/(US) gallon).
-Rownames are stored as variable \verb{"..rownames} with column role \code{"model"}.
+Rownames are stored as variable \code{"model"} with column role \code{"name"}.
 }
 \section{Construction}{
 
@@ -48,19 +48,19 @@ tsk("mtcars")
 }
 }
 
-Other Task: 
+Other Task:
 \code{\link{Task}},
 \code{\link{TaskClassif}},
 \code{\link{TaskRegr}},
 \code{\link{TaskSupervised}},
 \code{\link{TaskUnsupervised}},
+\code{\link{california_housing}},
 \code{\link{mlr_tasks}},
-\code{\link{mlr_tasks_boston_housing}},
 \code{\link{mlr_tasks_breast_cancer}},
+\code{\link{mlr_tasks_diabetes}},
 \code{\link{mlr_tasks_german_credit}},
 \code{\link{mlr_tasks_iris}},
 \code{\link{mlr_tasks_penguins}},
-\code{\link{mlr_tasks_pima}},
 \code{\link{mlr_tasks_sonar}},
 \code{\link{mlr_tasks_spam}},
 \code{\link{mlr_tasks_wine}},

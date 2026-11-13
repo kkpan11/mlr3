@@ -10,7 +10,8 @@
 \CRANpkg{palmerpenguins}
 }
 \description{
-Classification data to predict the species of penguins from the \CRANpkg{palmerpenguins} package, see \link[palmerpenguins:penguins]{palmerpenguins::penguins}.
+Classification data to predict the species of penguins from the \CRANpkg{palmerpenguins} package,
+see \link[palmerpenguins:penguins]{palmerpenguins::penguins}.
 A better alternative to the \link[=iris]{iris data set}.
 }
 \section{Dictionary}{
@@ -67,19 +68,19 @@ Gorman KB, Williams TD, Fraser WR (2014).
 }
 }
 
-Other Task: 
+Other Task:
 \code{\link{Task}},
 \code{\link{TaskClassif}},
 \code{\link{TaskRegr}},
 \code{\link{TaskSupervised}},
 \code{\link{TaskUnsupervised}},
+\code{\link{california_housing}},
 \code{\link{mlr_tasks}},
-\code{\link{mlr_tasks_boston_housing}},
 \code{\link{mlr_tasks_breast_cancer}},
+\code{\link{mlr_tasks_diabetes}},
 \code{\link{mlr_tasks_german_credit}},
 \code{\link{mlr_tasks_iris}},
 \code{\link{mlr_tasks_mtcars}},
-\code{\link{mlr_tasks_pima}},
 \code{\link{mlr_tasks_sonar}},
 \code{\link{mlr_tasks_spam}},
 \code{\link{mlr_tasks_wine}},

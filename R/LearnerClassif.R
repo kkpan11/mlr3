@@ -16,14 +16,14 @@
 #'
 #' Predefined learners can be found in the [dictionary][mlr3misc::Dictionary] [mlr_learners].
 #' Essential classification learners can be found in this dictionary after loading \CRANpkg{mlr3learners}.
-#' Additional learners are implement in the Github package \url{https://github.com/mlr-org/mlr3extralearners}.
+#' Additional learners are implemented in the Github package \url{https://github.com/mlr-org/mlr3extralearners}.
 #'
 #' @template param_id
+#' @template param_task_type
 #' @template param_param_set
 #' @template param_predict_types
 #' @template param_feature_types
 #' @template param_learner_properties
-#' @template param_data_formats
 #' @template param_packages
 #' @template param_label
 #' @template param_man
@@ -45,14 +45,119 @@
 #'
 #' # predict on new observations:
 #' lrn$predict(task, 201:344)$confusion
-LearnerClassif = R6Class("LearnerClassif", inherit = Learner,
+LearnerClassif = R6Class(
+  "LearnerClassif",
+  inherit = Learner,
   public = list(
     #' @description
     #' Creates a new instance of this [R6][R6::R6Class] class.
-    initialize = function(id, param_set = ps(), predict_types = "response", feature_types = character(), properties = character(), data_formats = "data.table", packages = character(), label = NA_character_, man = NA_character_) {
-      super$initialize(id = id, task_type = "classif", param_set = param_set, predict_types = predict_types,
-        feature_types = feature_types, properties = properties, data_formats = data_formats, packages = packages,
-        label = label, man = man)
+    initialize = function(
+      id,
+      task_type = "classif",
+      param_set = ps(),
+      predict_types = "response",
+      feature_types = character(),
+      properties = character(),
+      packages = character(),
+      label = NA_character_,
+      man = NA_character_
+    ) {
+      super$initialize(
+        id = id,
+        task_type = task_type,
+        param_set = param_set,
+        predict_types = predict_types,
+        feature_types = feature_types,
+        properties = properties,
+        packages = packages,
+        label = label,
+        man = man
+      )
+
+      if (getOption("mlr3.prob_as_default", FALSE) && "prob" %in% self$predict_types) {
+        self$predict_type = "prob"
+      }
+    },
+
+    #' @description
+    #' Predicts outcomes for new data in `newdata` using the model fitted during `$train()`.
+    #' This method is faster than `$predict_newdata()` as it skips assertions,
+    #' type conversions, encapsulation, and logging.
+    #' The learner must be trained before calling this method.
+    #'
+    #' Unlike `$predict_newdata()`, this method does not return a [Prediction] object.
+    #' Instead, it returns a list with either a `"response"` or `"prob"` element, depending on the prediction type.
+    #'
+    #' Note that `state$predict_time` and `state$log` will remain empty after using this method.
+    #' Some learners may not support this method and may fail when it is called.
+    #' Prefer `$predict_newdata()` unless performance is critical.
+    #'
+    #' If the model was trained via [resample()] or [benchmark()],
+    #' you must pass the associated task object stored in the corresponding [ResampleResult] or [BenchmarkResult].
+    #'
+    #' @param newdata [`data.table::data.table()`]\cr
+    #'   New data to predict on.
+    #' @param task ([Task]).
+    #'
+    #' @return `list()` with elements `"response"` or `"prob"` depending on the predict type.
+    predict_newdata_fast = function(newdata, task = NULL) {
+      if (is.null(self$state$model) && is.null(self$state$fallback_state$model)) {
+        error_config("Cannot predict, Learner '%s' has not been trained yet", self$id)
+      }
+      if (is.null(task) && is.null(self$state$train_task)) {
+        error_config("No task stored, and no task provided")
+      }
+      meta_task = self$state$train_task %??% task
+      feature_names = meta_task$feature_names
+      class_names = meta_task$class_names
+
+      # add data and most common used meta data
+      fake_task = list(
+        # some learners require that newdata contains the features names in the same order as the training data
+        data = function(...) newdata[, feature_names, with = FALSE],
+        class_names = class_names,
+        # binary learners use positive and negative to name and order the probability columns
+        positive = meta_task$positive,
+        negative = meta_task$negative,
+        # learners branch on the task type, other properties (e.g. offset) are not supported here
+        properties = intersect(meta_task$properties, c("twoclass", "multiclass")),
+        feature_names = feature_names,
+        nrow = nrow(newdata)
+      )
+
+      # train failed, use fallback
+      if (is.null(self$model) && !is.null(self$state$fallback_state$model)) {
+        return(with_fallback(self, function(fb) fb$predict_newdata_fast(newdata, task)))
+      }
+      pred = get_private(self)$.predict(fake_task)
+
+      # predict missing predictions with fallback
+      miss = logical(fake_task$nrow)
+      if (!is.null(pred$response)) {
+        miss = is.na(pred$response)
+      }
+
+      if (!is.null(pred$prob)) {
+        miss = miss | row_any_na(pred$prob)
+      }
+
+      miss_ids = which(miss)
+      if (length(miss_ids) && !is.null(self$state$fallback_state$model)) {
+        pred_miss = with_fallback(self, function(fb) fb$predict_newdata_fast(newdata[miss_ids, ], task))
+
+        if (!is.null(pred$response)) {
+          # learners return either character or factor responses; assigning a factor into a character vector
+          # would insert the integer codes, so impute by label
+          pred$response[miss_ids] = as.character(pred_miss$response)
+        }
+
+        if (!is.null(pred$prob)) {
+          # the fallback may order its probability columns differently, so align by class name
+          pred$prob[miss_ids, ] = pred_miss$prob[, colnames(pred$prob), drop = FALSE]
+        }
+      }
+
+      return(pred)
     }
   )
 )

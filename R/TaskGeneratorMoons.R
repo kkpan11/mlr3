@@ -18,7 +18,8 @@
 #'
 #' task = generator$generate(200)
 #' str(task$data())
-TaskGeneratorMoons = R6Class("TaskGeneratorMoons",
+TaskGeneratorMoons = R6Class(
+  "TaskGeneratorMoons",
   inherit = TaskGenerator,
   public = list(
     #' @description
@@ -27,10 +28,15 @@ TaskGeneratorMoons = R6Class("TaskGeneratorMoons",
       ps = ps(
         sigma = p_dbl(0, tags = "required")
       )
-      ps$values = list(sigma = 1)
+      ps$set_values(sigma = 1)
 
-      super$initialize(id = "moons", task_type = "classif", param_set = ps,
-        label = "Moons Classification", man = "mlr3::mlr_task_generators_moons")
+      super$initialize(
+        id = "moons",
+        task_type = "classif",
+        param_set = ps,
+        label = "Moons Classification",
+        man = "mlr3::mlr_task_generators_moons"
+      )
     },
 
     #' @description

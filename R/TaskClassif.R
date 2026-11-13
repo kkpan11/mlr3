@@ -18,7 +18,6 @@
 #' @template param_backend
 #' @template param_rows
 #' @template param_cols
-#' @template param_data_format
 #'
 #' @template seealso_task
 #' @export
@@ -32,7 +31,8 @@
 #' task$class_names
 #' task$positive
 #' task$data(rows = 1:3, cols = task$feature_names[1:2])
-TaskClassif = R6Class("TaskClassif",
+TaskClassif = R6Class(
+  "TaskClassif",
   inherit = TaskSupervised,
   public = list(
     #' @description
@@ -50,8 +50,13 @@ TaskClassif = R6Class("TaskClassif",
     initialize = function(id, backend, target, positive = NULL, label = NA_character_, extra_args = list()) {
       assert_string(target)
       super$initialize(
-        id = id, task_type = "classif", backend = backend,
-        target = target, label = label, extra_args = extra_args)
+        id = id,
+        task_type = "classif",
+        backend = backend,
+        target = target,
+        label = label,
+        extra_args = extra_args
+      )
 
       update_classif_property(self, private)
 
@@ -59,6 +64,40 @@ TaskClassif = R6Class("TaskClassif",
         # NB: this also sets `extra_args$positive`
         self$positive = positive
       }
+    },
+
+    #' @description
+    #' Printer.
+    #' @param ... (ignored).
+    print = function(...) {
+      super$print(...)
+
+      if (!is.null(private$.backend) && self$nrow <= getOption("mlr3.print_class_ratio_threshold", 1000000L)) {
+        class_freqs = private$get_class_freqs()
+        classes = if ("twoclass" %in% self$properties) {
+          sprintf(
+            "%s (positive class, %.0f%%), %s (%.0f%%)",
+            self$positive,
+            class_freqs[[self$positive]],
+            self$negative,
+            class_freqs[[self$negative]]
+          )
+        } else {
+          if (length(class_freqs) > 10L) {
+            paste0(
+              toString(sprintf("%s (%.0f%%)", names(class_freqs)[1:10], class_freqs[1:10])),
+              " + ",
+              length(class_freqs) - 10,
+              " more"
+            )
+          } else {
+            toString(sprintf("%s (%.0f%%)", names(class_freqs), class_freqs))
+          }
+        }
+      } else {
+        classes = toString(self$class_names)
+      }
+      cat_cli(cli_li("Target classes: {classes}"))
     },
 
     #' @description
@@ -76,7 +115,7 @@ TaskClassif = R6Class("TaskClassif",
     #'
     #' @return Modified `self`.
     droplevels = function(cols = NULL) {
-      super$droplevels()
+      super$droplevels(cols)
       update_classif_property(self, private)
       invisible(self)
     }
@@ -87,7 +126,7 @@ TaskClassif = R6Class("TaskClassif",
     #' Returns all class labels of the target column.
     class_names = function(rhs) {
       assert_ro_binding(rhs)
-      fget(self$col_info, i = self$target_names, j = "levels", key = "id")[[1L]]
+      fget_key(self$col_info, i = self$target_names, j = "levels", key = "id")[[1L]]
     },
 
     #' @field positive (`character(1)`)\cr
@@ -103,15 +142,18 @@ TaskClassif = R6Class("TaskClassif",
       }
 
       if (length(lvls) != 2L) {
-        stopf("Setting the positive class is only feasible for binary classification")
+        error_input("Setting the positive class is only feasible for binary classification")
       }
       positive = assert_choice(rhs, lvls)
       negative = setdiff(lvls, rhs)
       self$extra_args$positive = positive
       lvls = c(positive, negative)
-      ii = self$col_info[list(self$target_names), on = "id", which = TRUE]
-      set(self$col_info, i = ii, j = "levels", value = list(lvls))
-      set(self$col_info, i = ii, j = "fix_factor_levels", value = TRUE)
+      private$.hash = NULL
+      ci = copy(private$.col_info)
+      ii = ci[list(self$target_names), on = "id", which = TRUE]
+      set(ci, i = ii, j = "levels", value = list(lvls))
+      set(ci, i = ii, j = "fix_factor_levels", value = TRUE)
+      private$.col_info = ci
 
       lvls
     },
@@ -124,28 +166,38 @@ TaskClassif = R6Class("TaskClassif",
       if (length(lvls) != 2L) {
         return(NA_character_)
       }
-      return(lvls[2L])
+      lvls[2L]
     }
   ),
 
   private = list(
-    # TODO: remove this method in the future, but keep it for now to
-    # be backward compatible
-    .update_class_property = function() {
-      update_classif_property(self, private)
+    .class_freqs = NULL,
+    .class_freqs_hash = NULL,
+
+    # Relative class frequencies (in percent), sorted decreasingly.
+    # Querying the target column can be slow for tasks with many rows, so the result is cached
+    # and only recomputed when the task hash changed.
+    get_class_freqs = function() {
+      hash = self$hash
+      if (!identical(private$.class_freqs_hash, hash)) {
+        class_freqs = table(self$truth()) / self$nrow * 100
+        private$.class_freqs = class_freqs[order(-class_freqs, names(class_freqs))]
+        private$.class_freqs_hash = hash
+      }
+      private$.class_freqs
     }
   )
 )
 
 update_classif_property = function(self, private) {
   tn = self$target_names
-  if (fget(self$col_info, tn, "type", key = "id") %nin% c("factor", "ordered")) {
-    stopf("Target column '%s' must be a factor or ordered factor", tn)
+  if (fget_key(self$col_info, tn, "type", key = "id") %nin% c("factor", "ordered")) {
+    error_input("Target column '%s' must be a factor or ordered factor", tn)
   }
 
   nlvls = length(self$class_names)
   if (nlvls < 2L) {
-    stopf("Target column '%s' must have at least two levels", tn)
+    error_input("Target column '%s' must have at least two levels", tn)
   }
 
   private$.properties = setdiff(private$.properties, c("twoclass", "multiclass"))

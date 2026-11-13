@@ -1,0 +1,195 @@
+test_that("LearnerClassif predict_newdata_fast response works", {
+  learner = lrn("classif.debug")
+  task = tsk("sonar")
+  newdata = task$data()
+  learner$train(task)
+  pred = learner$predict_newdata_fast(newdata)
+
+  expect_list(pred)
+  expect_names(names(pred), subset.of = c("response", "prob"))
+  expect_character(pred$response)
+})
+
+test_that("LearnerClassif predict_newdata_fast errors on untrained learner", {
+  task = tsk("sonar")
+  learner = lrn("classif.debug")
+  expect_error(learner$predict_newdata_fast(task$data(), task), "has not been trained yet")
+})
+
+test_that("LearnerClassif predict_newdata_fast prob works", {
+  learner = lrn("classif.debug", predict_type = "prob")
+  task = tsk("sonar")
+  newdata = task$data()
+  learner$train(task)
+  pred = learner$predict_newdata_fast(newdata)
+
+  expect_list(pred)
+  expect_names(names(pred), subset.of = c("response", "prob"))
+  expect_matrix(pred$prob, nrows = nrow(newdata), ncols = length(task$class_names))
+})
+
+test_that("LearnerClassif predict_newdata_fast works with missing values", {
+  learner = lrn("classif.debug", predict_missing = 0.5)
+  learner$encapsulate("evaluate", fallback = lrn("classif.featureless"))
+  task = tsk("sonar")
+  newdata = task$data()
+  learner$train(task)
+  pred = learner$predict_newdata_fast(newdata)
+
+  expect_list(pred)
+  expect_names(names(pred), subset.of = c("response", "prob"))
+  expect_character(pred$response, any.missing = FALSE)
+
+  learner = lrn("classif.debug", predict_missing = 0.5, predict_type = "prob")
+  learner$encapsulate("evaluate", fallback = lrn("classif.featureless", predict_type = "prob"))
+  task = tsk("sonar")
+  newdata = task$data()
+  learner$train(task)
+  pred = learner$predict_newdata_fast(newdata)
+
+  expect_list(pred)
+  expect_names(names(pred), subset.of = c("response", "prob"))
+  expect_matrix(pred$prob, nrows = nrow(newdata), ncols = length(task$class_names), any.missing = FALSE)
+})
+
+test_that("LearnerClassif predict_newdata_fast works with failed train", {
+  learner = lrn("classif.debug", predict_missing = 0.5, error_train = 1)
+  learner$encapsulate("evaluate", fallback = lrn("classif.featureless"))
+  task = tsk("sonar")
+  newdata = task$data()
+  learner$train(task)
+  pred = learner$predict_newdata_fast(newdata)
+
+  expect_list(pred)
+  expect_names(names(pred), subset.of = c("response", "prob"))
+  expect_character(pred$response, any.missing = FALSE)
+
+  learner = lrn("classif.debug", predict_missing = 0.5, predict_type = "prob", error_train = 1)
+  learner$encapsulate("evaluate", fallback = lrn("classif.featureless", predict_type = "prob"))
+  task = tsk("sonar")
+  newdata = task$data()
+  learner$train(task)
+  pred = learner$predict_newdata_fast(newdata)
+
+  expect_list(pred)
+  expect_names(names(pred), subset.of = c("response", "prob"))
+  expect_matrix(pred$prob, nrows = nrow(newdata), ncols = length(task$class_names), any.missing = FALSE)
+})
+
+test_that("LearnerClassif predict_newdata_fast restores fallback state after parallel resample", {
+  skip_if_not_installed("future")
+  skip_if_not_installed("future.callr")
+
+  task = tsk("sonar")
+  newdata = task$data()
+
+  # parallel execution sends the learner across a process boundary, so the trained fallback survives
+  # only in the learner state, not on the fallback object itself
+  resample_parallel = function(...) {
+    learner = lrn("classif.debug", ...)
+    learner$encapsulate("evaluate", fallback = lrn("classif.featureless"))
+    rr = with_future(future.callr::callr, resample(task, learner, rsmp("holdout"), store_models = TRUE))
+    l = rr$learners[[1]]
+    expect_true(is.null(l$fallback$state$model))
+    l
+  }
+
+  # train fully failed -> wholesale fallback
+  pred = resample_parallel(error_train = 1)$predict_newdata_fast(newdata, task)
+  expect_character(pred$response, len = nrow(newdata), any.missing = FALSE)
+
+  # partial missing predictions -> fallback imputation
+  pred = resample_parallel(predict_missing = 0.5)$predict_newdata_fast(newdata, task)
+  expect_character(pred$response, len = nrow(newdata), any.missing = FALSE)
+})
+
+test_that("LearnerClassif predict_newdata_fast syncs fallback predict_type", {
+  task = tsk("sonar")
+  newdata = task$data()
+
+  # main learner predicts "prob" while the fallback is left at its default "response":
+  # the predict type is only synced in the predict path, so the fallback object stays unsynced after train
+  learner = lrn("classif.debug", predict_missing = 0.5, predict_type = "prob")
+  expect_warning(learner$encapsulate("evaluate", fallback = lrn("classif.featureless")), "different predict types")
+  learner$train(task)
+  expect_equal(learner$fallback$predict_type, "response")
+
+  pred = learner$predict_newdata_fast(newdata)
+  expect_matrix(pred$prob, nrows = nrow(newdata), ncols = length(task$class_names), any.missing = FALSE)
+})
+
+test_that("LearnerClassif predict_newdata_fast aligns fallback prob columns by name", {
+  # target levels are not in appearance order, so the fallback (orders columns by appearance) and the main
+  # learner (orders by level) produce prob matrices with different column orders; a positional substitution
+  # would silently report each class's probability under the wrong class name
+  set.seed(1)
+  dt = data.table(x = rnorm(100), y = factor(c(rep("a", 70), rep("b", 20), rep("c", 10)), levels = c("c", "b", "a")))
+  task = TaskClassif$new("align", dt, target = "y")
+
+  prior = lrn("classif.featureless", predict_type = "prob")$train(task)$predict_newdata_fast(dt[1])$prob[1, ]
+
+  # predict_missing = 1 imputes every row with the fallback, so the whole prob matrix must equal the priors
+  learner = lrn("classif.debug", predict_type = "prob", predict_missing = 1)
+  learner$encapsulate("evaluate", fallback = lrn("classif.featureless", predict_type = "prob"))
+  learner$train(task)
+  pred = learner$predict_newdata_fast(dt)
+
+  expect_equal(pred$prob[1, names(prior)], prior)
+})
+
+test_that("LearnerClassif predict_newdata_fast passes positive and negative class (#1520)", {
+  LearnerBinary = R6Class(
+    "LearnerBinary",
+    inherit = LearnerClassifDebug,
+    private = list(
+      .predict = function(task, ...) {
+        prob = matrix(c(0.1, 0.9), nrow = task$nrow, ncol = 2L, byrow = TRUE)
+        colnames(prob) = c(task$negative, task$positive)
+        list(prob = prob)
+      }
+    )
+  )
+
+  task = tsk("sonar")
+  task$positive = "R"
+  learner = LearnerBinary$new()
+  learner$predict_type = "prob"
+  learner$train(task)
+  newdata = task$data(1:3, cols = task$feature_names)
+
+  pred = learner$predict_newdata_fast(newdata)
+  expect_equal(pred$prob[, task$class_names], learner$predict_newdata(newdata)$prob)
+  expect_equal(unname(pred$prob[, "R"]), rep(0.9, 3L))
+})
+
+test_that("LearnerClassif predict_newdata_fast passes task type properties", {
+  LearnerProps = R6Class(
+    "LearnerProps",
+    inherit = LearnerClassifDebug,
+    private = list(
+      .predict = function(task, ...) {
+        stopifnot(identical(task$properties, "multiclass"))
+        super$.predict(task, ...)
+      }
+    )
+  )
+
+  task = tsk("iris")
+  task$set_col_roles("Sepal.Length", add_to = "weights_learner")
+  learner = LearnerProps$new()
+  learner$train(task)
+
+  expect_list(learner$predict_newdata_fast(task$data(1:3, cols = task$feature_names)))
+})
+
+test_that("LearnerClassif predict_newdata_fast imputes a factor fallback response into a character response", {
+  task = tsk("iris")
+  learner = lrn("classif.debug", predict_missing = 1)
+  learner$encapsulate("evaluate", fallback = lrn("classif.rpart"))
+  learner$train(task)
+
+  pred = learner$predict_newdata_fast(task$data())
+  expect_character(pred$response, any.missing = FALSE)
+  expect_subset(pred$response, task$class_names)
+  expect_equal(pred$response, as.character(learner$predict_newdata(task$data())$response))
+})

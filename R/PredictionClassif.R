@@ -35,7 +35,8 @@
 #'
 #'   Note that there are the following edge cases for threshold equal to `0` which are handled specially:
 #'   1. With threshold 0 the resulting ratio gets `Inf` and thus gets always selected.
-#'      If there are multiple ratios with value `Inf`, one is selected according to `ties_method` (randomly per default).
+#'      If there are multiple ratios with value `Inf`, one is selected according to `ties_method`
+#'      (randomly per default).
 #'   2. If additionally the predicted probability is also 0, the ratio `0/0` results in `NaN` values.
 #'      These are simply replaced by `0` and thus will never get selected.
 #'
@@ -59,7 +60,9 @@
 #' # new predictions
 #' p$set_threshold(th)$response
 #' p$score(measures = msr("classif.ce"))
-PredictionClassif = R6Class("PredictionClassif", inherit = Prediction,
+PredictionClassif = R6Class(
+  "PredictionClassif",
+  inherit = Prediction,
   public = list(
     #' @description
     #' Creates a new instance of this [R6][R6::R6Class] class.
@@ -86,11 +89,41 @@ PredictionClassif = R6Class("PredictionClassif", inherit = Prediction,
     #'   If `prob` is provided, but `response` is not, the class labels are calculated from
     #'   the probabilities using [max.col()] with `ties.method` set to `"random"`.
     #'
+    #' @param weights (`numeric()`)\cr
+    #'   Vector of measure weights for each observation. Should be constructed from
+    #'   the `Task`'s `weights_measure` column.
+    #'
     #' @param check (`logical(1)`)\cr
     #'   If `TRUE`, performs some argument checks and predict type conversions.
-    initialize = function(task = NULL, row_ids = task$row_ids, truth = task$truth(), response = NULL, prob = NULL, check = TRUE) {
+    #'
+    #' @param extra (named `list()`)\cr
+    #'   Additional per-observation data to be stored in the prediction object.
+    #'   Each element must be a vector with the same length as `row_ids`.
+    #'   See the `$extra` field for details.
+    #'
+    #' @param raw (any)\cr
+    #'   Raw prediction object from the upstream model. Stored as-is without validation.
+    initialize = function(
+      task = NULL,
+      row_ids = task$row_ids,
+      truth = task$truth(),
+      response = NULL,
+      prob = NULL,
+      weights = NULL,
+      check = TRUE,
+      extra = NULL,
+      raw = NULL
+    ) {
       pdata = new_prediction_data(
-        list(row_ids = row_ids, truth = truth, response = response, prob = prob),
+        list(
+          row_ids = row_ids,
+          truth = truth,
+          response = response,
+          prob = prob,
+          weights = weights,
+          extra = extra,
+          raw = raw
+        ),
         task_type = "classif"
       )
 
@@ -103,7 +136,6 @@ PredictionClassif = R6Class("PredictionClassif", inherit = Prediction,
       self$predict_types = intersect(c("response", "prob"), names(pdata))
     },
 
-
     #' @description
     #' Sets the prediction response based on the provided threshold.
     #' See the section on thresholding for more information.
@@ -115,43 +147,20 @@ PredictionClassif = R6Class("PredictionClassif", inherit = Prediction,
     #'
     #' @return
     #' Returns the object itself, but modified **by reference**.
-    #' You need to explicitly `$clone()` the object beforehand if you want to keeps
+    #' You need to explicitly `$clone()` the object beforehand if you want to keep
     #' the object in its previous state.
     set_threshold = function(threshold, ties_method = "random") {
-      if (!is.matrix(self$data$prob)) {
-        stopf("Cannot set threshold, no probabilities available")
-      }
-      lvls = levels(self$truth)
-
-      if (length(threshold) == 1L) {
-        assert_number(threshold, lower = 0, upper = 1)
-        if (length(lvls) != 2L) {
-          stopf("Setting a single threshold only supported for binary classification problems")
-        }
-        prob = cbind(self$data$prob[, 1L], threshold)
-      } else {
-        assert_numeric(threshold, any.missing = FALSE, lower = 0, upper = 1, len = length(lvls))
-        assert_names(names(threshold), permutation.of = lvls)
-        threshold = threshold[lvls] # reorder thresh so it is in the same order as levels
-
-        # multiply all rows by threshold, then get index of max element per row
-        prob = self$data$prob %*% diag(1 / threshold) # can generate Inf for threshold 0
-        prob[is.na(prob)] = 0 # NaN results from 0 * Inf, replace with 0, c.f. #452
-      }
-
-      ind = max.col(prob, ties.method = ties_method)
-      self$data$response = factor(lvls[ind], levels = lvls)
+      self$data = set_threshold_pdata(self$data, threshold, ties_method)
       invisible(self)
     }
   ),
-
 
   active = list(
     #' @field response (`factor()`)\cr
     #' Access to the stored predicted class labels.
     response = function(rhs) {
       assert_ro_binding(rhs)
-      self$data$response %??% factor(rep(NA, length(self$data$row_ids)), levels(self$data$truth))
+      self$data$response %??% factor(rep(NA_character_, length(self$data$row_ids)), levels(self$data$truth))
     },
 
     #' @field prob (`matrix()`)\cr
@@ -172,14 +181,52 @@ PredictionClassif = R6Class("PredictionClassif", inherit = Prediction,
 )
 
 #' @export
-as.data.table.PredictionClassif = function(x, ...) { # nolint
+# nolint next
+as.data.table.PredictionClassif = function(x, ...) {
   tab = as.data.table(x$data[c("row_ids", "truth", "response")])
 
-  if ("prob" %in% x$predict_types) {
+  if ("prob" %chin% x$predict_types) {
     prob = as.data.table(x$data$prob)
     setnames(prob, names(prob), paste0("prob.", names(prob)))
     tab = rcbind(tab, prob)
   }
 
+  if (!is.null(x$data$extra)) {
+    tab = cbind(tab, as.data.table(x$data$extra))
+  }
+
+  if (!is.null(x$data$weights)) {
+    tab$weights = x$data$weights
+  }
+
   tab[]
+}
+
+set_threshold_pdata = function(pdata, threshold, ties_method) {
+  if (!is.matrix(pdata$prob)) {
+    error_input("Cannot set threshold, no probabilities available")
+  }
+  lvls = levels(pdata$truth)
+
+  if (length(threshold) == 1L) {
+    assert_number(threshold, lower = 0, upper = 1)
+    if (length(lvls) != 2L) {
+      error_input("Setting a single threshold only supported for binary classification problems")
+    }
+    prob = cbind(pdata$prob[, 1L], threshold)
+  } else {
+    assert_numeric(threshold, any.missing = FALSE, lower = 0, upper = 1, len = length(lvls))
+    assert_names(names(threshold), permutation.of = lvls)
+    threshold = threshold[lvls] # reorder thresh so it is in the same order as levels
+
+    # multiply all rows by threshold, then get index of max element per row
+    prob = pdata$prob %*% diag(1 / threshold) # can generate Inf for threshold 0
+    prob[is.na(prob)] = 0 # NaN results from 0 * Inf, replace with 0, c.f. #452
+  }
+
+  ind = max.col(prob, ties.method = ties_method)
+  # missing predictions stay missing
+  ind[row_any_na(pdata$prob)] = NA_integer_
+  pdata$response = factor(lvls[ind], levels = lvls)
+  pdata
 }

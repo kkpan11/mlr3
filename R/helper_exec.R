@@ -4,20 +4,20 @@ allow_partial_matching = list(
   warnPartialMatchDollar = FALSE
 )
 
-
 set_encapsulation = function(learners, encapsulate) {
-  assert_choice(encapsulate, c(NA_character_, "none", "evaluate", "callr", "try"))
+  assert_choice(encapsulate, c(NA_character_, "none", "evaluate", "callr", "mirai", "try"))
 
   if (!is.na(encapsulate)) {
-    lapply(learners, function(learner) learner$encapsulate = c(train = encapsulate, predict = encapsulate))
-    if (encapsulate %in% c("evaluate", "callr")) {
-      task_type = unique(map_chr(learners, "task_type"))
-      stopifnot(length(task_type) == 1L) # this should not be possible for benchmarks
-      fb = get_featureless_learner(task_type)
-      if (!is.null(fb)) {
-        lapply(learners, function(learner) if (is.null(learner$fallback)) learner$fallback = fb$clone(TRUE))
+    lapply(learners, function(learner) {
+      fallback = NULL
+      if (encapsulate != "none") {
+        fallback = learner$fallback %??% default_fallback(learner)
+        if (is.null(fallback)) {
+          error_config("Could not find default fallback learner for learner '%s'", learner$id)
+        }
       }
-    }
+      learner$encapsulate(encapsulate, fallback)
+    })
   }
   learners
 }
@@ -26,23 +26,56 @@ future_map = function(n, FUN, ..., MoreArgs = list()) {
   if (getOption("mlr3.debug", FALSE)) {
     lg$info("Running experiments sequentially in debug mode with %i iterations", n)
     mapply(FUN, ..., MoreArgs = MoreArgs, SIMPLIFY = FALSE, USE.NAMES = FALSE)
+  } else if (
+    isNamespaceLoaded("mirai") &&
+      mirai::daemons_set(.compute = getOption("mlr3.mirai_parallelization", "mlr3_parallelization"))
+  ) {
+    lg$debug("Running resample() via mirai with %i iterations", n)
+    # .stop re-raises errors from the workers instead of returning them as `miraiError` values
+    mirai::collect_mirai(
+      mirai::mirai_map(
+        data.table(...),
+        FUN,
+        .args = c(MoreArgs, list(is_sequential = FALSE)),
+        .compute = getOption("mlr3.mirai_parallelization", "mlr3_parallelization")
+      ),
+      ".stop"
+    )
   } else {
     is_sequential = inherits(plan(), "sequential")
-    scheduling = if (!is_sequential && isTRUE(getOption("mlr3.exec_random", TRUE))) structure(TRUE, ordering = "random") else TRUE
     chunk_size = getOption("mlr3.exec_chunk_size", 1)
     chunk_bins = getOption("mlr3.exec_chunk_bins")
     if (!is.null(chunk_bins)) {
       chunk_size = ceiling(n / chunk_bins)
     }
+    # future.apply ignores `future.scheduling` when `future.chunk.size` is set,
+    # so the random ordering must be attached to the chunk size
+    if (!is_sequential && isTRUE(getOption("mlr3.exec_random", TRUE))) {
+      chunk_size = structure(chunk_size, ordering = "random")
+    }
     stdout = if (is_sequential) NA else TRUE
+
+    # workaround for sequential plan checking the size of the globals
+    # see https://github.com/futureverse/future/issues/197
+    if (is_sequential) {
+      old_opts = options(future.globals.maxSize = Inf)
+      on.exit(options(old_opts), add = TRUE)
+    }
 
     MoreArgs = c(MoreArgs, list(is_sequential = is_sequential))
 
     lg$debug("Running resample() via future with %i iterations", n)
     future.apply::future_mapply(
-      FUN, ..., MoreArgs = MoreArgs, SIMPLIFY = FALSE, USE.NAMES = FALSE,
-      future.globals = FALSE, future.packages = "mlr3", future.seed = TRUE,
-      future.scheduling = scheduling, future.chunk.size = chunk_size, future.stdout = stdout
+      FUN,
+      ...,
+      MoreArgs = MoreArgs,
+      SIMPLIFY = FALSE,
+      USE.NAMES = FALSE,
+      future.globals = FALSE,
+      future.packages = mlr_reflections$loaded_packages,
+      future.seed = TRUE,
+      future.chunk.size = chunk_size,
+      future.stdout = stdout
     )
   }
 }

@@ -28,13 +28,13 @@ distribution. Computes something like AUC of \code{c(c - 1)} binary classifiers
 while considering the a-priori distribution of the classes as suggested
 in Ferri (2009). Note we deviate from the definition in
 Ferri (2009) by a factor of \code{c}.
-The person implementing this function and writing this very
-documentation right now cautions against using this measure because it is
-an imperfect generalization of AU1U.
+\item \emph{MU}: Multiclass AUC as defined in Kleinman and Page (2019).
+This measure is an average of the pairwise AUCs between all classes.
+The measure was tested against the Python implementation by \href{https://github.com/kleimanr/auc_mu}{Ross Kleinman}.
 }
 }
 \note{
-The score function calls \code{\link[mlr3measures:mauc_aunu]{mlr3measures::mauc_aunp()}} from package \CRANpkg{mlr3measures}.
+The score function calls \code{\link[mlr3measures:mauc_aunp]{mlr3measures::mauc_aunp()}} from package \CRANpkg{mlr3measures}.
 
 If the measure is undefined for the input, \code{NaN} is returned.
 This can be customized by setting the field \code{na_value}.
@@ -70,7 +70,7 @@ Empty ParamSet
 
 \code{as.data.table(mlr_measures)} for a complete table of all (also dynamically created) \link{Measure} implementations.
 
-Other classification measures: 
+Other classification measures:
 \code{\link{mlr_measures_classif.acc}},
 \code{\link{mlr_measures_classif.auc}},
 \code{\link{mlr_measures_classif.bacc}},
@@ -89,6 +89,7 @@ Other classification measures:
 \code{\link{mlr_measures_classif.mauc_au1p}},
 \code{\link{mlr_measures_classif.mauc_au1u}},
 \code{\link{mlr_measures_classif.mauc_aunu}},
+\code{\link{mlr_measures_classif.mauc_mu}},
 \code{\link{mlr_measures_classif.mbrier}},
 \code{\link{mlr_measures_classif.mcc}},
 \code{\link{mlr_measures_classif.npv}},
@@ -103,7 +104,7 @@ Other classification measures:
 \code{\link{mlr_measures_classif.tp}},
 \code{\link{mlr_measures_classif.tpr}}
 
-Other multiclass classification measures: 
+Other multiclass classification measures:
 \code{\link{mlr_measures_classif.acc}},
 \code{\link{mlr_measures_classif.bacc}},
 \code{\link{mlr_measures_classif.ce}},
@@ -112,7 +113,9 @@ Other multiclass classification measures:
 \code{\link{mlr_measures_classif.mauc_au1p}},
 \code{\link{mlr_measures_classif.mauc_au1u}},
 \code{\link{mlr_measures_classif.mauc_aunu}},
-\code{\link{mlr_measures_classif.mbrier}}
+\code{\link{mlr_measures_classif.mauc_mu}},
+\code{\link{mlr_measures_classif.mbrier}},
+\code{\link{mlr_measures_classif.mcc}}
 }
 \concept{classification measures}
 \concept{multiclass classification measures}

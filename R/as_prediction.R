@@ -3,31 +3,42 @@
 #' @description
 #' Convert object to a [Prediction] or a list of [Prediction].
 #'
+#' @details
+#' Methods for [PredictionData] objects should default to `check = FALSE`.
+#' The data is usually validated already by [as_prediction_data()] before the conversion.
+#'
 #' @inheritParams as_prediction_data
 #'
 #' @return [Prediction].
 #' @export
 as_prediction = function(x, check = FALSE, ...) {
+  if (is.null(x)) {
+    return(list())
+  }
+
   UseMethod("as_prediction")
 }
 
 #' @rdname as_prediction
 #' @export
-as_prediction.Prediction = function(x, check = FALSE, ...) { # nolint
+# nolint next
+as_prediction.Prediction = function(x, check = FALSE, ...) {
   x
 }
 
 
 #' @rdname as_prediction
 #' @export
-as_prediction.PredictionDataClassif = function(x, check = FALSE, ...) { # nolint
+# nolint next
+as_prediction.PredictionDataClassif = function(x, check = FALSE, ...) {
   invoke(PredictionClassif$new, check = check, .args = x)
 }
 
 
 #' @rdname as_prediction
 #' @export
-as_prediction.PredictionDataRegr = function(x, check = FALSE, ...) { # nolint
+# nolint next
+as_prediction.PredictionDataRegr = function(x, check = FALSE, ...) {
   invoke(PredictionRegr$new, check = check, .args = x)
 }
 
@@ -41,19 +52,23 @@ as_predictions = function(x, predict_sets = "test", ...) {
 
 #' @rdname as_prediction
 #' @export
-as_predictions.list = function(x, predict_sets = "test", ...) { # nolint
-  assert_subset(predict_sets, mlr_reflections$predict_sets)
-
-  result = vector("list", length(x))
+# nolint next
+as_predictions.list = function(x, predict_sets = "test", ...) {
+  result = replicate(length(x), list())
   ii = lengths(x) > 0L
   result[ii] = map(x[ii], function(li) {
     assert_list(li, "PredictionData")
-    combined = do.call(c, discard(li[predict_sets], is.null))
-    if (is.null(combined)) {
-      list()
-    } else {
-      as_prediction(combined, check = FALSE)
+    li = discard(li[predict_sets], is.null)
+    if (length(li) == 0L) {
+      return(list())
     }
+
+    if (length(li) == 1L) {
+      combined = li[[1L]]
+    } else {
+      combined = do.call(c, li)
+    }
+    as_prediction(combined, check = FALSE)
   })
   result
 }

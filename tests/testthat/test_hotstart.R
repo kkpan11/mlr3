@@ -1,5 +1,5 @@
 test_that("learner is hotstarted when the hotstart parameter is increased", {
-  task = tsk("pima")
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1)
   learner_1$train(task)
   id = learner_1$model$id
@@ -15,7 +15,7 @@ test_that("learner is hotstarted when the hotstart parameter is increased", {
 })
 
 test_that("learner is directly returned when hotstart and target learner are equal", {
-  task = tsk("pima")
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1)
   learner_1$train(task)
   id = learner_1$model$id
@@ -29,7 +29,7 @@ test_that("learner is directly returned when hotstart and target learner are equ
 })
 
 test_that("learner is trained when target learner has an additional non-hotstart parameter", {
-  task = tsk("pima")
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1)
   learner_1$train(task)
   id = learner_1$model$id
@@ -46,7 +46,7 @@ test_that("learner is trained when target learner has an additional non-hotstart
 })
 
 test_that("learner is trained when target learner has an additional hotstart parameter", {
-  task = tsk("pima")
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", x = 0)
   learner_1$train(task)
   learner_1$state$param_vals$iter = NULL # iter set by default. Assume it is not.
@@ -60,8 +60,8 @@ test_that("learner is trained when target learner has an additional hotstart par
   expect_true(learner$model$id != id)
 })
 
-test_that("learner is trained when target learner has an increased hotstart parameter and additional non-hotstart parameter", {
-  task = tsk("pima")
+test_that("learner is trained when target learner when both hotstart and non-hotstart parameters are increased", {
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1)
   learner_1$train(task)
   id = learner_1$model$id
@@ -74,8 +74,8 @@ test_that("learner is trained when target learner has an increased hotstart para
   expect_true(learner$model$id != id)
 })
 
-test_that("learner is trained when the hotstart parameter of the target and hotstart learner are equal but the non-hotstart parameter is changed", {
-  task = tsk("pima")
+test_that("learner is trained when the hotstart parameter are equal but the non-hotstart parameter is altered", {
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1, x = 0)
   learner_1$train(task)
   id = learner_1$model$id
@@ -88,8 +88,8 @@ test_that("learner is trained when the hotstart parameter of the target and hots
   expect_true(learner$model$id != id)
 })
 
-test_that("learner is hotstarted when the non-hotstart parameter of the target and hotstart learner are equal but the hotstart parameter is increased", {
-  task = tsk("pima")
+test_that("learner is hotstarted when the non-hotstart parameter are equal but the hotstart parameter is increased", {
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1, x = 0)
   learner_1$train(task)
   id = learner_1$model$id
@@ -103,7 +103,7 @@ test_that("learner is hotstarted when the non-hotstart parameter of the target a
 })
 
 test_that("learner is trained when the task is different", {
-  task = tsk("pima")
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1)
   learner_1$train(task)
   id = learner_1$model$id
@@ -117,7 +117,7 @@ test_that("learner is trained when the task is different", {
 })
 
 test_that("learner is trained when the stack is empty", {
-  task = tsk("pima")
+  task = tsk("sonar")
   learner = lrn("classif.debug", iter = 2)
   learner$hotstart_stack = HotstartStack$new()
   learner$train(tsk("iris"))
@@ -126,7 +126,7 @@ test_that("learner is trained when the stack is empty", {
 })
 
 test_that("learners are hotstarted when resample is used", {
-  task = tsk("pima")
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1)
   resampling = rsmp("cv", folds = 3)
   resampling$instantiate(task)
@@ -147,14 +147,33 @@ test_that("learners are hotstarted when resample is used", {
   })
 })
 
+test_that("hotstarting does not carry over derived state of the start learner", {
+  task = tsk("iris")
+  resampling = rsmp("holdout")$instantiate(task)
+  rr = resample(task, lrn("classif.debug", iter = 1), resampling, store_models = TRUE)
+  start_learner = rr$learners[[1L]]
+  start_learner$state$predict_time = 100
+  start_learner$state$internal_valid_scores = list(acc = 1)
+
+  learner = lrn("classif.debug", iter = 2)
+  learner$hotstart_stack = HotstartStack$new(start_learner)
+  rr_2 = resample(task, learner, resampling, store_models = TRUE, allow_hotstart = TRUE)
+  state = rr_2$learners[[1L]]$state
+
+  expect_equal(state$model$iter, 2)
+  expect_lt(state$predict_time, 100)
+  expect_null(state$internal_valid_scores)
+  expect_null(state$train_task)
+})
+
 test_that("learners are hotstarted when benchmark is called", {
-  task = tsk("pima")
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1)
   learner_2 = lrn("classif.debug", iter = 2)
   resampling = rsmp("cv", folds = 3)
   resampling$instantiate(task)
 
-  design = benchmark_grid(task, list(learner_1, learner_2), resampling)
+  design = data.table(task = list(task), learner = list(learner_1, learner_2), resampling = list(resampling))
   bmr = benchmark(design, store_models = TRUE)
 
   learners = unlist(map(seq_len(bmr$n_resample_results), function(i) bmr$resample_result(i)$learners))
@@ -177,13 +196,13 @@ test_that("learners are hotstarted when benchmark is called", {
 })
 
 test_that("learners are trained and hotstarted when benchmark is called", {
-  task = tsk("pima")
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1)
   learner_2 = lrn("classif.debug", iter = 2)
   resampling = rsmp("cv", folds = 3)
   resampling$instantiate(task)
 
-  design = benchmark_grid(task, list(learner_1, learner_2), resampling)
+  design = data.table(task = list(task), learner = list(learner_1, learner_2), resampling = list(resampling))
   bmr = benchmark(design, store_models = TRUE)
 
   learners = unlist(map(seq_len(bmr$n_resample_results), function(i) bmr$resample_result(i)$learners))
@@ -213,31 +232,30 @@ test_that("learners are trained and hotstarted when benchmark is called", {
 })
 
 test_that("learners are cloned when hotstarting is applied", {
-  task = tsk("pima")
+  task = tsk("sonar")
   learner_1 = lrn("classif.debug", iter = 1)
   resampling = rsmp("holdout")
   resampling$instantiate(task)
 
   design = benchmark_grid(task, learner_1, resampling)
-  bmr  = benchmark(design, store_models = TRUE, allow_hotstart = TRUE)
+  bmr = benchmark(design, store_models = TRUE, allow_hotstart = TRUE)
 
   learner_2 = lrn("classif.debug", iter = 2)
   hot = HotstartStack$new(bmr$resample_result(1)$learners)
   learner_2$hotstart_stack = hot
 
   design = benchmark_grid(task, learner_2, resampling)
-  bmr  = benchmark(design, store_models = TRUE, allow_hotstart = TRUE)
+  bmr = benchmark(design, store_models = TRUE, allow_hotstart = TRUE)
 
   expect_equal(bmr$resample_result(1)$learners[[1]]$param_set$values$iter, 2)
   expect_equal(bmr$resample_result(1)$learners[[1]]$model$iter, 2)
   expect_equal(hot$stack$start_learner[[1]]$param_set$values$iter, 1)
   expect_equal(hot$stack$start_learner[[1]]$model$iter, 1)
-  expect_equal(bmr$resample_result(1)$learners[[1]]$model$id,
-    hot$stack$start_learner[[1]]$model$id)
+  expect_equal(bmr$resample_result(1)$learners[[1]]$model$id, hot$stack$start_learner[[1]]$model$id)
 })
 
 test_that("hotstarting works when col role is set in task", {
-  task = tsk("pima")
+  task = tsk("sonar")
   task$col_roles$stratum = task$target_names
   learner_1 = lrn("classif.debug", iter = 1)
   resampling = rsmp("holdout")
